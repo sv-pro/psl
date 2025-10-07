@@ -447,3 +447,89 @@ If you encounter issues not covered here:
 - [README.md](README.md) - Setup and quick start
 - Backend: `backend/psl/` - API and validation code
 - Frontend: `frontend/src/` - React application code
+
+## Health Check System
+
+PSL includes a comprehensive health check system to diagnose connectivity and model availability issues.
+
+### Running Health Checks
+
+```bash
+cd backend
+
+# Check all providers
+make healthcheck
+
+# Check specific provider  
+make check-openai
+make check-anthropic
+make check-ollama
+
+# List all available models
+make list-models
+```
+
+### Understanding Health Check Output
+
+```
+✅ Provider Name
+   Status: healthy
+   Message: API accessible
+   API Key: Configured
+   Models:
+     ✓ model-name: Model available (123.45ms)
+```
+
+**Status Indicators:**
+- ✅ `healthy` - Provider is working correctly
+- ⚙️ `unconfigured` - API key not set in .env
+- ❌ `unhealthy` - Provider has errors
+
+### Common Health Check Issues
+
+**"UNCONFIGURED" Status:**
+- API key not set in `backend/.env`
+- Solution: Add the appropriate API key to `.env` file
+
+**"UNHEALTHY - Connection timeout":**
+- Network connectivity issues
+- Firewall blocking API requests
+- Solution: Check internet connection, try with VPN off/on
+
+**"UNHEALTHY - Invalid API key":**
+- API key is incorrect or expired
+- Solution: Generate new API key from provider's dashboard
+
+**"Ollama - Cannot connect to http://localhost:11434":**
+- Ollama not running
+- Solution: Start Ollama with `ollama serve` or the Ollama app
+
+**"Model not found":**
+- Model not available in your account
+- For Ollama: Model not pulled locally
+- Solution: 
+  - Ollama: Run `ollama pull model-name`
+  - Cloud providers: Check account access/billing
+
+### Using Health Checks in CI/CD
+
+```bash
+# Fail if any provider is unhealthy
+make healthcheck --strict
+
+# Check specific provider before deployment
+make check-openai || exit 1
+```
+
+### Programmatic Usage
+
+```python
+from psl.health import HealthChecker
+
+checker = HealthChecker()
+results = checker.check_all()
+
+for provider, check in results.items():
+    print(f"{provider}: {check.status}")
+```
+

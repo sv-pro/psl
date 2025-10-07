@@ -1,4 +1,4 @@
-.PHONY: setup install test run clean shell
+.PHONY: setup install test run clean shell healthcheck check-openai check-anthropic check-ollama list-models
 
 # Detect if using pyenv or venv
 PYTHON := python3
@@ -59,8 +59,25 @@ shell:
 		echo "No virtual environment found. Run 'make setup' first."; \
 	fi
 
-# Full setup (create venv + install deps)
+# Health checks
+healthcheck:
+	@python -m psl.cli healthcheck
+
+check-openai:
+	@python -m psl.cli check openai
+
+check-anthropic:
+	@python -m psl.cli check anthropic
+
+check-ollama:
+	@python -m psl.cli check ollama
+
+list-models:
+	@python -m psl.cli list-models
+
+# Full setup (create venv + install deps + health check)
 init: setup install
+	@echo ""
 	@echo "Setup complete! Activate the environment:"
 	@if command -v pyenv > /dev/null 2>&1; then \
 		echo "  pyenv activate $(PYENV_VENV)"; \
@@ -68,3 +85,9 @@ init: setup install
 	else \
 		echo "  source $(VENV_DIR)/bin/activate"; \
 	fi
+	@echo ""
+	@echo "Running health checks..."
+	@echo ""
+	@python -m psl.cli healthcheck || true
+	@echo ""
+	@echo "💡 Tip: Run 'make healthcheck' anytime to check API connectivity"

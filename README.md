@@ -111,7 +111,9 @@ Requires `ANTHROPIC_API_KEY` in `backend/.env`
 
 ## Troubleshooting
 
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions to common issues.
+See documentation:
+- [HEALTH_CHECK.md](HEALTH_CHECK.md) - Health check system guide
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Detailed troubleshooting
 
 ### Quick Fixes
 
@@ -149,6 +151,32 @@ pip install --upgrade pip
 pip install --pre pydantic-core pydantic
 pip install -r requirements.txt
 ```
+
+## Health Checks
+
+Verify API connectivity and model availability:
+
+```bash
+cd backend
+
+# Check all providers
+make healthcheck
+
+# Check specific provider
+make check-openai
+make check-anthropic
+make check-ollama
+
+# List available models
+make list-models
+```
+
+The health check verifies:
+- ✅ API keys are configured correctly
+- ✅ Providers are accessible
+- ✅ Models are available in your account
+- ✅ Response times for each model
+
 
 ## Testing
 
