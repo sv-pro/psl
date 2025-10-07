@@ -20,7 +20,7 @@ app.add_middleware(
 
 class LintRequest(BaseModel):
     prompt: str
-    model: str = "claude-3-5-sonnet-20241022"
+    model: str = "gpt-4"
 
 class LintResponse(BaseModel):
     ir: IR

@@ -44,7 +44,7 @@ Look for:
 
 Return ONLY valid JSON matching the schema."""
 
-    def __init__(self, model: str = "claude-3-5-sonnet-20241022"):
+    def __init__(self, model: str = "gpt-4"):
         self.model = model
 
     def parse(self, prompt_text: str) -> IR:

@@ -86,7 +86,34 @@ npm run dev
 
 Frontend will be running at `http://localhost:5173`
 
+## Supported Models
+
+### OpenAI Models
+- `gpt-4` - GPT-4 (recommended, most reliable)
+- `gpt-3.5-turbo` - GPT-3.5 Turbo (faster, cheaper)
+
+Requires `OPENAI_API_KEY` in `backend/.env`
+
+### Anthropic Claude Models (2025)
+- `claude-sonnet-4-5-20250929` - Claude Sonnet 4.5 (latest, most capable)
+- `claude-3-7-sonnet-20250219` - Claude Sonnet 3.7
+- `claude-3-5-haiku-20241022` - Claude Haiku 3.5 (fast & cost-efficient)
+
+Requires `ANTHROPIC_API_KEY` in `backend/.env`
+
+**Note**: Model names change over time. For the latest official model names, see:
+- OpenAI: https://platform.openai.com/docs/models
+- Anthropic: https://docs.anthropic.com/en/docs/about-claude/models
+
+### Local Models
+- `ollama/llama2` - Llama 2 via Ollama (requires Ollama running locally)
+- Configure `OLLAMA_API_BASE=http://localhost:11434` in `backend/.env`
+
 ## Troubleshooting
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions to common issues.
+
+### Quick Fixes
 
 ### Python 3.13 Installation Issues
 
@@ -127,7 +154,9 @@ pip install -r requirements.txt
 
 ```bash
 cd backend
-pytest tests/
+make test       # Checks environment and runs tests
+# OR
+pytest tests/   # Run directly
 ```
 
 ## How It Works

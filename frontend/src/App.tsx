@@ -12,7 +12,7 @@ ALL metrics must be calculated from the manifest.`;
 
 function App() {
   const [prompt, setPrompt] = useState(EXAMPLE_PROMPT);
-  const [model, setModel] = useState('claude-3-5-sonnet-20241022');
+  const [model, setModel] = useState('gpt-4');
   const [results, setResults] = useState<LintResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,10 +47,14 @@ function App() {
                 onChange={e => setModel(e.target.value)}
                 className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2"
               >
-                <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                <option value="gpt-4">GPT-4</option>
-                <option value="ollama/llama2">Llama 2 (local)</option>
+                <option value="gpt-4">GPT-4 (OpenAI)</option>
+                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                <option value="claude-3-5-haiku-20241022">Claude Haiku 3.5 (fast & cheap)</option>
+                <option value="ollama/llama2">Llama 2 (requires local Ollama)</option>
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Configure API keys in backend/.env
+              </p>
             </div>
 
             <label className="block text-sm font-medium mb-2">System Prompt</label>
