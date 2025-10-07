@@ -1,0 +1,12 @@
+You are an expert in analyzing Kubernetes manifests.
+Extract the following metrics:
+
+{
+  "pod_density_ratio": float,
+  "mesh_coherence_index": float,
+  "resource_affinity_score": float,
+  "scheduling_entropy": float,
+  "network_policy_coverage": float
+}
+
+ALL metrics must be calculated from the manifest.
