@@ -15,7 +15,7 @@ See [PITCH.md](PITCH.md) for the complete value proposition.
 **Interactive UI** with 8 curated prompt examples:
 - Load bad prompts → see lint errors → execute → observe hallucinations
 - Load fixed prompts → no errors → execute → correct output
-- Compare across 19 models (OpenAI, Anthropic, Ollama)
+- Compare across 26 models (OpenAI, Anthropic, Google, Ollama)
 - Run didactic evaluation matrix to see which models demonstrate PSL's value
 
 ## Quick Start
@@ -245,13 +245,13 @@ PSL demonstrates **A.G.I.L.E. principles** (Auditable, Gradual, Interpretable, L
 1. **Semantic Parser** - Uses LLM to convert prompts into structured IR (Intermediate Representation)
 2. **Validator** - Runs deterministic linting rules on the IR
 3. **Didactic Evaluator** - Tests prompts × models to measure demonstration effectiveness
-4. **LLM Adapter Layer** - Unified interface across OpenAI, Anthropic, Ollama
+4. **LLM Adapter Layer** - Unified interface across OpenAI, Anthropic, Google, Ollama
 
 **Key Components:**
 
 - **8 Prompt Examples** - 4 bad, 4 good (K8s, finance, code, sentiment)
 - **Didactic Scoring** - Bad prompt + hallucination = ✅ (proves PSL's value)
-- **Model Benchmarking** - Compare 19 models using quality-controlled prompts
+- **Model Benchmarking** - Compare 26 models using quality-controlled prompts
 - **API Endpoints** - `/lint`, `/execute`, `/evaluate`, `/models`, `/examples`
 
 ## Current Rules
@@ -262,8 +262,9 @@ PSL demonstrates **A.G.I.L.E. principles** (Auditable, Gradual, Interpretable, L
 
 ✅ **Implemented:**
 
-- Custom LLM adapter layer (OpenAI, Anthropic, Ollama)
-- 19 models supported with latest versions
+- Custom LLM adapter layer (OpenAI, Anthropic, Google, Ollama)
+- 26 models supported with latest versions
+- YAML-based model configuration (add models without code changes)
 - 8 curated prompt examples (good and bad)
 - Didactic evaluation system
 - Model benchmarking with quality-controlled prompts

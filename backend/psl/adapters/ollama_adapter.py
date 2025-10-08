@@ -20,6 +20,9 @@ class OllamaAdapter(LLMAdapter):
         "codellama",
         "phi",
         "neural-chat",
+        "gemma",
+        "gemma:2b",
+        "gemma:7b",
     ]
 
     def __init__(self, model: str, api_key: str | None = None, **kwargs):

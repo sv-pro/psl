@@ -4,26 +4,71 @@ from typing import Dict, List
 
 from .anthropic_adapter import AnthropicAdapter
 from .base import LLMAdapter
+from .config import get_all_providers, load_model_config
+from .google_adapter import GoogleAdapter
 from .ollama_adapter import OllamaAdapter
 from .openai_adapter import OpenAIAdapter
 
 
-# Model to provider mapping
-MODEL_REGISTRY: Dict[str, type[LLMAdapter]] = {}
+# Adapter class mapping
+ADAPTER_CLASSES = {
+    "OpenAIAdapter": OpenAIAdapter,
+    "AnthropicAdapter": AnthropicAdapter,
+    "GoogleAdapter": GoogleAdapter,
+    "OllamaAdapter": OllamaAdapter,
+}
 
-# Register OpenAI models
-for model in OpenAIAdapter.SUPPORTED_MODELS:
-    MODEL_REGISTRY[model] = OpenAIAdapter
 
-# Register Anthropic models
-for model in AnthropicAdapter.SUPPORTED_MODELS:
-    MODEL_REGISTRY[model] = AnthropicAdapter
+def _build_model_registry() -> Dict[str, type[LLMAdapter]]:
+    """Build model registry from config file.
 
-# Register Ollama models (with ollama/ prefix)
-for model in OllamaAdapter.SUPPORTED_MODELS:
-    MODEL_REGISTRY[f"ollama/{model}"] = OllamaAdapter
-    # Also support without prefix for convenience
-    MODEL_REGISTRY[model] = OllamaAdapter
+    Returns:
+        Dictionary mapping model names to adapter classes
+    """
+    registry: Dict[str, type[LLMAdapter]] = {}
+
+    try:
+        providers = get_all_providers()
+
+        for provider_name, provider_config in providers.items():
+            adapter_class_name = provider_config.get("adapter_class")
+            models = provider_config.get("models", [])
+            prefix = provider_config.get("prefix", "")
+
+            if adapter_class_name not in ADAPTER_CLASSES:
+                print(f"Warning: Unknown adapter class '{adapter_class_name}' for provider '{provider_name}'")
+                continue
+
+            adapter_class = ADAPTER_CLASSES[adapter_class_name]
+
+            # Register models with provider prefix if specified
+            for model in models:
+                if prefix:
+                    # Register with prefix (e.g., ollama/llama2)
+                    registry[f"{prefix}{model}"] = adapter_class
+                    # Also register without prefix for convenience
+                    registry[model] = adapter_class
+                else:
+                    registry[model] = adapter_class
+
+    except Exception as e:
+        print(f"Warning: Failed to load model config, falling back to hardcoded values: {e}")
+        # Fallback to hardcoded values if config fails
+        for model in OpenAIAdapter.SUPPORTED_MODELS:
+            registry[model] = OpenAIAdapter
+        for model in AnthropicAdapter.SUPPORTED_MODELS:
+            registry[model] = AnthropicAdapter
+        for model in GoogleAdapter.SUPPORTED_MODELS:
+            registry[model] = GoogleAdapter
+        for model in OllamaAdapter.SUPPORTED_MODELS:
+            registry[f"ollama/{model}"] = OllamaAdapter
+            registry[model] = OllamaAdapter
+
+    return registry
+
+
+# Build model registry from config
+MODEL_REGISTRY = _build_model_registry()
 
 
 def get_adapter(model: str, **kwargs) -> LLMAdapter:
@@ -56,6 +101,8 @@ def get_adapter(model: str, **kwargs) -> LLMAdapter:
         return OpenAIAdapter(model, **kwargs)
     elif model.startswith("claude-"):
         return AnthropicAdapter(model, **kwargs)
+    elif model.startswith("gemini-"):
+        return GoogleAdapter(model, **kwargs)
     elif model.startswith("ollama/") or "/" not in model:
         # Assume it's an Ollama model if it has no provider prefix
         actual_model = model.replace("ollama/", "")
@@ -82,15 +129,35 @@ def list_available_models() -> Dict[str, List[str]]:
             'ollama': ['ollama/llama2', 'ollama/mistral', ...]
         }
     """
-    models_by_provider: Dict[str, List[str]] = {
-        "openai": OpenAIAdapter.SUPPORTED_MODELS.copy(),
-        "anthropic": AnthropicAdapter.SUPPORTED_MODELS.copy(),
-        "ollama": [f"ollama/{m}" for m in OllamaAdapter.SUPPORTED_MODELS],
-    }
+    models_by_provider: Dict[str, List[str]] = {}
 
-    # Sort models within each provider
-    for provider in models_by_provider:
-        models_by_provider[provider].sort()
+    try:
+        providers = get_all_providers()
+
+        for provider_name, provider_config in providers.items():
+            models = provider_config.get("models", [])
+            prefix = provider_config.get("prefix", "")
+
+            # Apply prefix if specified (e.g., ollama/)
+            if prefix:
+                models_by_provider[provider_name] = [f"{prefix}{m}" for m in models]
+            else:
+                models_by_provider[provider_name] = models.copy()
+
+            # Sort models within each provider
+            models_by_provider[provider_name].sort()
+
+    except Exception as e:
+        print(f"Warning: Failed to load model config, falling back to hardcoded values: {e}")
+        # Fallback to hardcoded values
+        models_by_provider = {
+            "openai": OpenAIAdapter.SUPPORTED_MODELS.copy(),
+            "anthropic": AnthropicAdapter.SUPPORTED_MODELS.copy(),
+            "google": GoogleAdapter.SUPPORTED_MODELS.copy(),
+            "ollama": [f"ollama/{m}" for m in OllamaAdapter.SUPPORTED_MODELS],
+        }
+        for provider in models_by_provider:
+            models_by_provider[provider].sort()
 
     return models_by_provider
 

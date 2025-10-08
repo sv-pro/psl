@@ -1,0 +1,61 @@
+# PSL Model Configuration
+# Define supported models for each LLM provider
+#
+# This file is used by the adapter factory to determine which models are available
+# and how to route requests to the appropriate provider.
+#
+# Format:
+#   providers:
+#     provider_name:
+#       adapter_class: ClassName
+#       models:
+#         - model_id
+#         - model_id:variant
+
+providers:
+  openai:
+    adapter_class: OpenAIAdapter
+    description: OpenAI GPT models via native SDK
+    models:
+      - gpt-4
+      - gpt-4-turbo
+      - gpt-4-turbo-preview
+      - gpt-3.5-turbo
+      - gpt-3.5-turbo-16k
+
+  anthropic:
+    adapter_class: AnthropicAdapter
+    description: Anthropic Claude models via native SDK
+    models:
+      - claude-sonnet-4-5-20250929  # Latest Sonnet 4.5
+      - claude-3-5-sonnet-20241022
+      - claude-3-5-haiku-20241022
+      - claude-3-opus-20240229
+      - claude-3-sonnet-20240229
+      - claude-3-haiku-20240307
+
+  google:
+    adapter_class: GoogleAdapter
+    description: Google AI (Gemini) models via REST API
+    models:
+      - gemini-pro
+      - gemini-pro-vision
+      - gemini-1.5-pro
+      - gemini-1.5-flash
+
+  ollama:
+    adapter_class: OllamaAdapter
+    description: Local models via Ollama (httpx)
+    prefix: ollama/  # Models accessible as ollama/model_name
+    models:
+      - llama2
+      - llama2:13b
+      - llama2:70b
+      - mistral
+      - mixtral
+      - codellama
+      - phi
+      - neural-chat
+      - gemma
+      - gemma:2b
+      - gemma:7b

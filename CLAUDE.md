@@ -28,7 +28,9 @@ PSL uses a three-stage architecture:
   - `anthropic_adapter.py` - Anthropic implementation using native `anthropic` SDK
   - `ollama_adapter.py` - Ollama implementation using `httpx` for local models
   - `factory.py` - Factory pattern with `get_adapter()` and `list_available_models()`
-  - **19 models supported** across 3 providers (OpenAI, Anthropic, Ollama)
+  - `config.py` - YAML config loader for model registry
+  - `models.yaml` - **Configurable model list** (add/remove models without code changes)
+  - **26 models supported** across 4 providers (OpenAI, Anthropic, Google, Ollama)
   - Replaces LiteLLM with direct API calls for latest model support
 
 - **Rules System** ([backend/psl/rules/](backend/psl/rules/)):
@@ -164,10 +166,11 @@ PSL uses a **custom adapter layer** for multi-provider support with direct API c
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-proj-...
+GOOGLE_API_KEY=AIza...  # For Gemini models
 OLLAMA_API_BASE=http://localhost:11434  # Optional, for local models
 ```
 
-**Supported Models (19 total):**
+**Supported Models (26 total):**
 
 **OpenAI** (via `openai` SDK):
 
@@ -180,11 +183,25 @@ OLLAMA_API_BASE=http://localhost:11434  # Optional, for local models
 - `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`
 - `claude-3-opus-20240229`, `claude-3-sonnet-20240229`, `claude-3-haiku-20240307`
 
+**Google** (via REST API):
+
+- `gemini-1.5-pro`, `gemini-1.5-flash`
+- `gemini-pro`, `gemini-pro-vision`
+
 **Ollama** (via `httpx` for local models):
 
 - `ollama/llama2`, `ollama/llama2:13b`, `ollama/llama2:70b`
 - `ollama/mistral`, `ollama/mixtral`, `ollama/codellama`
 - `ollama/phi`, `ollama/neural-chat`
+- `ollama/gemma`, `ollama/gemma:2b`, `ollama/gemma:7b`
+
+**Model Configuration:**
+
+Models are configured in [backend/psl/adapters/models.yaml](backend/psl/adapters/models.yaml). To add new models:
+
+1. Edit `models.yaml` and add the model to the appropriate provider section
+2. The factory will automatically load the new model on next import
+3. Verify with `make list-models` or `make healthcheck`
 
 **Model Support:**
 All models are supported through direct SDK integration - no LiteLLM dependency means latest models work immediately. Verify availability with `make healthcheck` or `make list-models`.
