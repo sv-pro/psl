@@ -1,10 +1,13 @@
 """Health check module for verifying API connectivity and model availability"""
 
+import asyncio
 import os
 import httpx
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
+
+from .adapters import get_adapter, list_available_models
 
 
 class HealthStatus(Enum):
@@ -35,13 +38,14 @@ class ProviderCheck:
 
 
 class HealthChecker:
-    """Check health of various LLM providers"""
+    """Check health of various LLM providers using adapter layer"""
 
     def __init__(self):
         self.timeout = httpx.Timeout(10.0)
+        self.available_models = list_available_models()
 
-    def check_openai(self) -> ProviderCheck:
-        """Check OpenAI API connectivity and model availability"""
+    async def check_openai_async(self) -> ProviderCheck:
+        """Check OpenAI API connectivity and model availability using adapter"""
         api_key = os.getenv("OPENAI_API_KEY")
 
         if not api_key:
@@ -53,77 +57,65 @@ class HealthChecker:
                 models_checked=[]
             )
 
-        # Test connectivity with models list endpoint
-        try:
-            with httpx.Client(timeout=self.timeout) as client:
-                response = client.get(
-                    "https://api.openai.com/v1/models",
-                    headers={"Authorization": f"Bearer {api_key}"}
-                )
+        # Check first available model using adapter
+        models_to_check = self.available_models.get("openai", ["gpt-4"])[:2]
+        model_checks = []
 
-                if response.status_code == 200:
-                    # Check specific models
-                    models_to_check = ["gpt-4", "gpt-3.5-turbo"]
-                    models_data = response.json().get("data", [])
-                    available_models = {m["id"] for m in models_data}
+        for model in models_to_check:
+            try:
+                adapter = get_adapter(model)
+                is_healthy = await adapter.health_check()
 
-                    model_checks = []
-                    for model in models_to_check:
-                        if model in available_models:
-                            model_checks.append(ModelCheck(
-                                model=model,
-                                status=HealthStatus.HEALTHY,
-                                message="Model available"
-                            ))
-                        else:
-                            model_checks.append(ModelCheck(
-                                model=model,
-                                status=HealthStatus.UNHEALTHY,
-                                message="Model not found in account"
-                            ))
-
-                    return ProviderCheck(
-                        provider="OpenAI",
+                if is_healthy:
+                    model_checks.append(ModelCheck(
+                        model=model,
                         status=HealthStatus.HEALTHY,
-                        message="API accessible",
-                        api_key_configured=True,
-                        models_checked=model_checks
-                    )
-                elif response.status_code == 401:
-                    return ProviderCheck(
-                        provider="OpenAI",
-                        status=HealthStatus.UNHEALTHY,
-                        message="Invalid API key",
-                        api_key_configured=True,
-                        models_checked=[]
-                    )
+                        message="Model available"
+                    ))
                 else:
-                    return ProviderCheck(
-                        provider="OpenAI",
+                    model_checks.append(ModelCheck(
+                        model=model,
                         status=HealthStatus.UNHEALTHY,
-                        message=f"API error: {response.status_code}",
-                        api_key_configured=True,
-                        models_checked=[]
-                    )
-        except httpx.TimeoutException:
-            return ProviderCheck(
-                provider="OpenAI",
-                status=HealthStatus.UNHEALTHY,
-                message="Connection timeout",
-                api_key_configured=True,
-                models_checked=[]
-            )
-        except Exception as e:
-            return ProviderCheck(
-                provider="OpenAI",
-                status=HealthStatus.UNHEALTHY,
-                message=f"Error: {str(e)}",
-                api_key_configured=True,
-                models_checked=[]
-            )
+                        message="Health check failed"
+                    ))
+            except ValueError as e:
+                # API key issue
+                return ProviderCheck(
+                    provider="OpenAI",
+                    status=HealthStatus.UNHEALTHY,
+                    message=str(e),
+                    api_key_configured=True,
+                    models_checked=[]
+                )
+            except Exception as e:
+                model_checks.append(ModelCheck(
+                    model=model,
+                    status=HealthStatus.UNHEALTHY,
+                    message=f"Error: {str(e)}"
+                ))
 
-    def check_anthropic(self) -> ProviderCheck:
-        """Check Anthropic API connectivity and model availability"""
+        # Determine overall status
+        if any(m.status == HealthStatus.HEALTHY for m in model_checks):
+            status = HealthStatus.HEALTHY
+            message = "API accessible"
+        else:
+            status = HealthStatus.UNHEALTHY
+            message = "No models available"
+
+        return ProviderCheck(
+            provider="OpenAI",
+            status=status,
+            message=message,
+            api_key_configured=True,
+            models_checked=model_checks
+        )
+
+    def check_openai(self) -> ProviderCheck:
+        """Sync wrapper for OpenAI health check"""
+        return asyncio.run(self.check_openai_async())
+
+    async def check_anthropic_async(self) -> ProviderCheck:
+        """Check Anthropic API connectivity and model availability using adapter"""
         api_key = os.getenv("ANTHROPIC_API_KEY")
 
         if not api_key:
@@ -135,78 +127,43 @@ class HealthChecker:
                 models_checked=[]
             )
 
-        # Test with a minimal API call
-        models_to_check = ["claude-3-5-haiku-20241022"]
+        # Check first available model using adapter
+        models_to_check = self.available_models.get("anthropic", ["claude-3-5-haiku-20241022"])[:2]
         model_checks = []
 
         for model in models_to_check:
             try:
-                import time
-                start = time.time()
+                adapter = get_adapter(model)
+                is_healthy = await adapter.health_check()
 
-                with httpx.Client(timeout=self.timeout) as client:
-                    response = client.post(
-                        "https://api.anthropic.com/v1/messages",
-                        headers={
-                            "x-api-key": api_key,
-                            "anthropic-version": "2023-06-01",
-                            "content-type": "application/json"
-                        },
-                        json={
-                            "model": model,
-                            "max_tokens": 10,
-                            "messages": [{"role": "user", "content": "Hi"}]
-                        }
-                    )
-
-                    elapsed = (time.time() - start) * 1000
-
-                    if response.status_code == 200:
-                        model_checks.append(ModelCheck(
-                            model=model,
-                            status=HealthStatus.HEALTHY,
-                            message="Model available",
-                            response_time_ms=round(elapsed, 2)
-                        ))
-                    elif response.status_code == 404:
-                        model_checks.append(ModelCheck(
-                            model=model,
-                            status=HealthStatus.UNHEALTHY,
-                            message="Model not found"
-                        ))
-                    elif response.status_code == 401:
-                        return ProviderCheck(
-                            provider="Anthropic",
-                            status=HealthStatus.UNHEALTHY,
-                            message="Invalid API key",
-                            api_key_configured=True,
-                            models_checked=[]
-                        )
-                    else:
-                        error_data = response.json()
-                        model_checks.append(ModelCheck(
-                            model=model,
-                            status=HealthStatus.UNHEALTHY,
-                            message=f"Error: {error_data.get('error', {}).get('message', 'Unknown')}"
-                        ))
-            except httpx.TimeoutException:
+                if is_healthy:
+                    model_checks.append(ModelCheck(
+                        model=model,
+                        status=HealthStatus.HEALTHY,
+                        message="Model available"
+                    ))
+                else:
+                    model_checks.append(ModelCheck(
+                        model=model,
+                        status=HealthStatus.UNHEALTHY,
+                        message="Health check failed"
+                    ))
+            except ValueError as e:
                 return ProviderCheck(
                     provider="Anthropic",
                     status=HealthStatus.UNHEALTHY,
-                    message="Connection timeout",
+                    message=str(e),
                     api_key_configured=True,
                     models_checked=[]
                 )
             except Exception as e:
-                return ProviderCheck(
-                    provider="Anthropic",
+                model_checks.append(ModelCheck(
+                    model=model,
                     status=HealthStatus.UNHEALTHY,
-                    message=f"Error: {str(e)}",
-                    api_key_configured=True,
-                    models_checked=[]
-                )
+                    message=f"Error: {str(e)}"
+                ))
 
-        # Overall status based on model checks
+        # Determine overall status
         if any(m.status == HealthStatus.HEALTHY for m in model_checks):
             status = HealthStatus.HEALTHY
             message = "API accessible"
@@ -222,76 +179,82 @@ class HealthChecker:
             models_checked=model_checks
         )
 
-    def check_ollama(self) -> ProviderCheck:
-        """Check Ollama connectivity and model availability"""
+    def check_anthropic(self) -> ProviderCheck:
+        """Sync wrapper for Anthropic health check"""
+        return asyncio.run(self.check_anthropic_async())
+
+    async def check_ollama_async(self) -> ProviderCheck:
+        """Check Ollama connectivity and model availability using adapter"""
         base_url = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
 
+        # Check a default model using adapter
+        models_to_check = ["ollama/llama2"]
+        model_checks = []
+
         try:
-            with httpx.Client(timeout=self.timeout) as client:
-                # Check if Ollama is running
-                response = client.get(f"{base_url}/api/tags")
+            for model in models_to_check:
+                try:
+                    adapter = get_adapter(model, base_url=base_url)
+                    is_healthy = await adapter.health_check()
 
-                if response.status_code == 200:
-                    data = response.json()
-                    models = data.get("models", [])
-
-                    if not models:
-                        return ProviderCheck(
-                            provider="Ollama",
+                    if is_healthy:
+                        model_checks.append(ModelCheck(
+                            model=model,
                             status=HealthStatus.HEALTHY,
-                            message="Ollama running but no models installed",
-                            api_key_configured=True,
-                            models_checked=[]
-                        )
-
-                    model_checks = [
-                        ModelCheck(
-                            model=m["name"],
-                            status=HealthStatus.HEALTHY,
-                            message=f"Available (size: {m.get('size', 'unknown')})"
-                        )
-                        for m in models[:5]  # Limit to first 5
-                    ]
-
-                    return ProviderCheck(
-                        provider="Ollama",
-                        status=HealthStatus.HEALTHY,
-                        message=f"Ollama running with {len(models)} model(s)",
-                        api_key_configured=True,
-                        models_checked=model_checks
-                    )
-                else:
-                    return ProviderCheck(
-                        provider="Ollama",
+                            message="Model available"
+                        ))
+                        # If one model works, also list other available models
+                        if hasattr(adapter, 'list_available_models'):
+                            available = await adapter.list_available_models()
+                            for av_model in available[:5]:  # Limit to 5
+                                if av_model != model.replace("ollama/", ""):
+                                    model_checks.append(ModelCheck(
+                                        model=f"ollama/{av_model}",
+                                        status=HealthStatus.HEALTHY,
+                                        message="Available"
+                                    ))
+                        break  # Success, no need to check more
+                    else:
+                        model_checks.append(ModelCheck(
+                            model=model,
+                            status=HealthStatus.UNHEALTHY,
+                            message="Model not found (pull with: ollama pull llama2)"
+                        ))
+                except Exception as e:
+                    model_checks.append(ModelCheck(
+                        model=model,
                         status=HealthStatus.UNHEALTHY,
-                        message=f"Unexpected status: {response.status_code}",
-                        api_key_configured=True,
-                        models_checked=[]
-                    )
-        except httpx.ConnectError:
+                        message=f"Error: {str(e)}"
+                    ))
+
+            # Determine overall status
+            if any(m.status == HealthStatus.HEALTHY for m in model_checks):
+                status = HealthStatus.HEALTHY
+                message = f"Ollama running at {base_url}"
+            else:
+                status = HealthStatus.UNHEALTHY
+                message = f"Ollama may not be running or no models available at {base_url}"
+
             return ProviderCheck(
                 provider="Ollama",
-                status=HealthStatus.UNHEALTHY,
-                message=f"Cannot connect to {base_url}. Is Ollama running?",
+                status=status,
+                message=message,
                 api_key_configured=True,
-                models_checked=[]
+                models_checked=model_checks
             )
-        except httpx.TimeoutException:
-            return ProviderCheck(
-                provider="Ollama",
-                status=HealthStatus.UNHEALTHY,
-                message="Connection timeout",
-                api_key_configured=True,
-                models_checked=[]
-            )
+
         except Exception as e:
             return ProviderCheck(
                 provider="Ollama",
                 status=HealthStatus.UNHEALTHY,
-                message=f"Error: {str(e)}",
+                message=f"Cannot connect to {base_url}: {str(e)}",
                 api_key_configured=True,
                 models_checked=[]
             )
+
+    def check_ollama(self) -> ProviderCheck:
+        """Sync wrapper for Ollama health check"""
+        return asyncio.run(self.check_ollama_async())
 
     def check_all(self) -> Dict[str, ProviderCheck]:
         """Check all providers"""
