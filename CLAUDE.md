@@ -8,10 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-PSL uses a two-stage architecture:
+PSL uses a three-stage architecture:
 
 1. **Semantic Parser** ([backend/psl/parser.py](backend/psl/parser.py)) - Uses an LLM to convert natural language prompts into structured Intermediate Representation (IR)
 2. **Validator** ([backend/psl/validator.py](backend/psl/validator.py)) - Runs linting rules against the IR to detect issues
+3. **Didactic Evaluator** ([backend/psl/evaluation.py](backend/psl/evaluation.py)) - Tests prompts against models to measure didactic effectiveness
 
 ### Core Components
 
@@ -21,19 +22,51 @@ PSL uses a two-stage architecture:
   - `DomainTerm` - Domain-specific terminology
   - `IR` - Top-level intermediate representation
 
+- **LLM Adapter Layer** ([backend/psl/adapters/](backend/psl/adapters/)):
+  - `base.py` - Abstract `LLMAdapter` interface with `LLMMessage` and `LLMResponse`
+  - `openai_adapter.py` - OpenAI implementation using native `openai` SDK
+  - `anthropic_adapter.py` - Anthropic implementation using native `anthropic` SDK
+  - `ollama_adapter.py` - Ollama implementation using `httpx` for local models
+  - `factory.py` - Factory pattern with `get_adapter()` and `list_available_models()`
+  - **19 models supported** across 3 providers (OpenAI, Anthropic, Ollama)
+  - Replaces LiteLLM with direct API calls for latest model support
+
 - **Rules System** ([backend/psl/rules/](backend/psl/rules/)):
   - `base.py` - Abstract `Rule` class and `LintError` model
   - `hallucination.py` - `NoUndefinedComputedFieldsRule` (currently the only rule)
   - Each rule implements `check(ir: IR) -> List[LintError]`
 
+- **Prompt Examples** ([backend/psl/examples/](backend/psl/examples/)):
+  - `bad/` - 4 prompts demonstrating semantic issues (K8s, finance, code, sentiment)
+  - `good/` - 4 fixed versions with proper definitions and fallback strategies
+  - `contexts/` - Test inputs for each example
+  - `metadata.json` - Example descriptions, categories, and expected behaviors
+
+- **Didactic Evaluation** ([backend/psl/evaluation.py](backend/psl/evaluation.py)):
+  - Tests all prompts × all models to measure didactic effectiveness
+  - **Didactic scoring logic**:
+    - Bad prompt + hallucination → ✅ Success (demonstrates PSL's value)
+    - Good prompt + correct output → ✅ Success (shows solutions work)
+    - Bad prompt + no hallucination → ❌ Failure (model too conservative)
+    - Good prompt + hallucination → ❌ Failure (model unreliable)
+  - Generates evaluation matrix with success rates per model
+  - Hallucination detection heuristics
+
 - **FastAPI Backend** ([backend/psl/api.py](backend/psl/api.py)):
   - `POST /lint` - Analyzes prompt for semantic issues, accepts `{prompt: str, model: str}`
     - Returns `{ir: IR, errors: List[LintError], summary: dict}`
-  - `POST /execute` - Executes prompt with context to show actual LLM behavior, accepts `{prompt: str, context: str, model: str}`
+  - `POST /execute` - Executes prompt with context to show actual LLM behavior
+    - Accepts `{prompt: str, context: str, model: str}`
     - Returns `{output: str, model: str, has_errors: bool}`
+  - `GET /models` - Lists all available models grouped by provider
+  - `GET /examples` - Fetches all prompt examples with content
+  - `POST /evaluate` - Runs didactic evaluation matrix
+    - Accepts `{example_ids?: string[], models?: string[]}`
+    - Returns `{results: [...], summary: {...}}`
   - CORS enabled for localhost:5173 (Vite dev server)
 
 - **Health Check System** ([backend/psl/health.py](backend/psl/health.py), [backend/psl/cli.py](backend/psl/cli.py)):
+  - Uses adapter layer for consistent health checks
   - Verifies API connectivity and model availability
   - Supports OpenAI, Anthropic Claude, and Ollama
   - Used via `make healthcheck` or specific provider checks
@@ -126,7 +159,7 @@ npm run lint
 
 ## Working with LLM Providers
 
-PSL uses [LiteLLM](https://github.com/BerriAI/litellm) for multi-provider support. API keys are configured in `backend/.env`:
+PSL uses a **custom adapter layer** for multi-provider support with direct API calls. API keys are configured in `backend/.env`:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
@@ -134,13 +167,27 @@ OPENAI_API_KEY=sk-proj-...
 OLLAMA_API_BASE=http://localhost:11434  # Optional, for local models
 ```
 
-**Supported Models:**
-- OpenAI: `gpt-4`, `gpt-3.5-turbo`
-- Anthropic: `claude-3-5-haiku-20241022` (verified working)
-- Ollama: `ollama/llama2` (requires Ollama running locally)
+**Supported Models (19 total):**
 
-**Model Compatibility Note:**
-Newer Claude models like `claude-sonnet-4-5-20250929` may not be supported yet by LiteLLM. Always verify with `make check-anthropic` or check LiteLLM's model support.
+**OpenAI** (via `openai` SDK):
+
+- `gpt-4`, `gpt-4-turbo`, `gpt-4-turbo-preview`
+- `gpt-3.5-turbo`, `gpt-3.5-turbo-16k`
+
+**Anthropic** (via `anthropic` SDK):
+
+- `claude-sonnet-4-5-20250929` ✨ **Latest model**
+- `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`
+- `claude-3-opus-20240229`, `claude-3-sonnet-20240229`, `claude-3-haiku-20240307`
+
+**Ollama** (via `httpx` for local models):
+
+- `ollama/llama2`, `ollama/llama2:13b`, `ollama/llama2:70b`
+- `ollama/mistral`, `ollama/mixtral`, `ollama/codellama`
+- `ollama/phi`, `ollama/neural-chat`
+
+**Model Support:**
+All models are supported through direct SDK integration - no LiteLLM dependency means latest models work immediately. Verify availability with `make healthcheck` or `make list-models`.
 
 ## Testing Philosophy
 
@@ -276,14 +323,22 @@ curl -X POST http://localhost:8000/execute \
 ## Technology Stack Details
 
 ### Backend
+
 - **Python**: 3.11+ required (3.13 recommended with pyenv)
-- **FastAPI**: >=0.115.0
-- **LiteLLM**: >=1.52.0 (multi-provider LLM abstraction)
+- **FastAPI**: >=0.115.0 (async web framework)
 - **Pydantic**: >=2.10.0 (data validation and IR models)
 - **pytest**: >=8.3.0 (testing framework)
 - **python-dotenv**: >=1.0.1 (environment variable management)
+- **httpx**: >=0.28.0 (async HTTP client for Ollama)
+
+**LLM Provider SDKs:**
+
+- **openai**: >=1.57.0 (OpenAI native SDK)
+- **anthropic**: >=0.40.0 (Anthropic native SDK)
+- **No LiteLLM** - replaced with custom adapter layer for latest model support
 
 ### Frontend
+
 - **React**: 19.1.1 (latest)
 - **TypeScript**: ~5.9.3
 - **Vite**: ^7.1.7 (build tool)
