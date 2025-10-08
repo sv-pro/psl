@@ -98,7 +98,25 @@ export interface ModelsResponse {
 }
 
 export async function getModels(): Promise<ModelsResponse> {
-  const response = await fetch(`${API_BASE}/models`);
+  const response = await fetch(`${API_BASE}/models`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(10000) // 10 second timeout
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function getHealthyModels(): Promise<ModelsResponse> {
+  const response = await fetch(`${API_BASE}/models/healthy`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(15000) // 15 second timeout for health checks
+  });
 
   if (!response.ok) {
     throw new Error(`API error: ${response.statusText}`);

@@ -122,8 +122,16 @@ class HealthChecker:
         )
 
     def check_openai(self) -> ProviderCheck:
-        """Sync wrapper for OpenAI health check"""
-        return asyncio.run(self.check_openai_async())
+        """Sync wrapper for OpenAI health check - deprecated, use check_openai_async"""
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            # If we're already in an event loop, we can't use asyncio.run()
+            # This should not be called from async context
+            raise RuntimeError("check_openai() called from async context - use check_openai_async() instead")
+        except RuntimeError:
+            # No running loop, safe to use asyncio.run()
+            return asyncio.run(self.check_openai_async())
 
     async def check_anthropic_async(self) -> ProviderCheck:
         """Check Anthropic API connectivity and model availability using adapter"""
@@ -387,8 +395,37 @@ class HealthChecker:
         
         return provider_methods[provider_name]()
 
-    def check_all(self) -> Dict[str, ProviderCheck]:
-        """Check all providers dynamically based on models.yaml"""
+    async def check_provider_async(self, provider_name: str) -> ProviderCheck:
+        """Check a specific provider by name dynamically (async version)"""
+        provider_methods = {
+            "openai": self.check_openai_async,
+            "anthropic": self.check_anthropic_async,
+            "google": self.check_google_async,
+            "ollama": self.check_ollama_async,
+        }
+        
+        if provider_name not in provider_methods:
+            raise ValueError(f"Unknown provider: {provider_name}")
+        
+        return await provider_methods[provider_name]()
+
+    async def check_all(self) -> List[ProviderCheck]:
+        """Check all providers dynamically based on models.yaml (async version)"""
+        results = []
+        
+        # Check all providers that have models configured
+        for provider_name in self.available_models.keys():
+            try:
+                result = await self.check_provider_async(provider_name)
+                results.append(result)
+            except ValueError:
+                # Provider method not implemented yet
+                pass
+        
+        return results
+
+    def check_all_sync(self) -> Dict[str, ProviderCheck]:
+        """Check all providers dynamically based on models.yaml (sync version)"""
         results = {}
         
         # Check all providers that have models configured

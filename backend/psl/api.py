@@ -66,8 +66,15 @@ async def lint_prompt(req: LintRequest):
 
         return LintResponse(ir=ir, errors=errors, summary=summary)
 
+    except ValueError as e:
+        # Model not found or configuration errors
+        raise HTTPException(status_code=400, detail=f"Invalid model or configuration: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log the full error for debugging
+        import traceback
+        print(f"ERROR in /lint endpoint: {str(e)}")
+        print(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 @app.post("/execute", response_model=ExecuteResponse)
 async def execute_prompt(req: ExecuteRequest):
@@ -101,6 +108,49 @@ async def health():
 async def get_models() -> Dict[str, List[str]]:
     """Get all available models grouped by provider"""
     return list_available_models()
+
+@app.get("/models/healthy")
+async def get_healthy_models() -> Dict[str, List[str]]:
+    """Get only models that pass health checks grouped by provider"""
+    try:
+        from .health import HealthChecker
+        
+        # Get all configured models
+        all_models = list_available_models()
+        
+        # Run health checks
+        health_checker = HealthChecker()
+        health_results = await health_checker.check_all()
+        
+        # Filter to only healthy models
+        healthy_models = {}
+        
+        for provider_check in health_results:
+            if provider_check.status.value == "healthy":
+                provider_name = provider_check.provider.lower()
+                healthy_model_names = []
+                
+                for model_check in provider_check.models_checked:
+                    if model_check.status.value == "healthy":
+                        # Extract model name (remove provider prefix if present)
+                        model_name = model_check.model
+                        if model_name.startswith("ollama/"):
+                            model_name = model_name  # Keep ollama/ prefix for consistency
+                        elif "/" in model_name:
+                            model_name = model_name.split("/", 1)[1]
+                        healthy_model_names.append(model_name)
+                
+                if healthy_model_names:
+                    healthy_models[provider_name] = healthy_model_names
+        
+        return healthy_models
+    
+    except Exception as e:
+        # Log the full error for debugging
+        import traceback
+        print(f"ERROR in /models/healthy endpoint: {str(e)}")
+        print(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
 
 @app.get("/examples")
 async def get_examples():

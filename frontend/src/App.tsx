@@ -1,6 +1,6 @@
 import { useState, useEffect, ReactNode } from 'react';
 import Editor from '@monaco-editor/react';
-import { lintPrompt, executePrompt, getExamples, getModels, LintResponse, ExecuteResponse, PromptExample, ModelsResponse } from './api/client';
+import { lintPrompt, executePrompt, getExamples, getModels, getHealthyModels, LintResponse, ExecuteResponse, PromptExample, ModelsResponse } from './api/client';
 
 function App() {
   const [prompt, setPrompt] = useState('');
@@ -16,6 +16,7 @@ function App() {
   const [examples, setExamples] = useState<PromptExample[]>([]);
   const [models, setModels] = useState<ModelsResponse | null>(null);
   const [selectedExample, setSelectedExample] = useState<string>('');
+  const [showHealthyOnly, setShowHealthyOnly] = useState<boolean>(true);
 
   // Load examples and models on mount
   useEffect(() => {
@@ -23,7 +24,10 @@ function App() {
       try {
         const [examplesData, modelsData] = await Promise.all([
           getExamples(),
-          getModels()
+          showHealthyOnly ? getHealthyModels().catch(() => {
+            console.warn('Health check failed, falling back to all models');
+            return getModels();
+          }) : getModels()
         ]);
         setExamples(examplesData.examples);
         setModels(modelsData);
@@ -49,12 +53,13 @@ function App() {
         }
       } catch (err) {
         console.error('Failed to load examples/models:', err);
+        setError(`Failed to connect to backend: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     };
     loadData();
   // Only run once on mount - we check the current state inside the effect
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showHealthyOnly]);
 
   // Handle example selection
   const handleExampleChange = (exampleId: string) => {
@@ -180,7 +185,18 @@ function App() {
 
           {/* Model Selector */}
           <div>
-            <label className="block text-sm font-medium mb-2">Model</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium">Model</label>
+              <label className="flex items-center text-xs">
+                <input
+                  type="checkbox"
+                  checked={showHealthyOnly}
+                  onChange={(e) => setShowHealthyOnly(e.target.checked)}
+                  className="mr-1"
+                />
+                Healthy only
+              </label>
+            </div>
             <select
               value={model}
               onChange={e => setModel(e.target.value)}
@@ -235,7 +251,9 @@ function App() {
               )}
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Configure API keys in backend/.env
+              {showHealthyOnly 
+                ? "Showing only models that pass health checks" 
+                : "Configure API keys in backend/.env"}
             </p>
           </div>
         </div>
@@ -300,6 +318,13 @@ function App() {
             {error && (
               <div className="mt-4 p-4 bg-red-900/50 border border-red-700 rounded text-red-300 text-sm">
                 <strong>Error:</strong> {error}
+                {error.includes('Failed to connect') && (
+                  <div className="mt-2 text-xs">
+                    <p>• Check if backend is running on http://localhost:8000</p>
+                    <p>• Try refreshing the page</p>
+                    <p>• Disable "Healthy only" if health checks are failing</p>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -17,10 +17,11 @@
 
 providers:
   openai:
-    enabled: false 
+    enabled: true 
     adapter_class: OpenAIAdapter
     description: OpenAI GPT models via native SDK
     models:
+      - gpt-5
       - gpt-4
       - gpt-4-turbo
       - gpt-4-turbo-preview
@@ -40,7 +41,7 @@ providers:
       - claude-3-haiku-20240307
 
   google:
-    # enabled: false  # Set to false to disable this provider
+    enabled: false  # Set to false to disable this provider
     adapter_class: GoogleAdapter
     description: Google AI (Gemini) models via REST API
     models:

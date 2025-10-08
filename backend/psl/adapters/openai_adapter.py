@@ -12,6 +12,7 @@ class OpenAIAdapter(LLMAdapter):
     """Adapter for OpenAI models (GPT-4, GPT-3.5, etc.)."""
 
     SUPPORTED_MODELS = [
+        "gpt-5",
         "gpt-4",
         "gpt-4-turbo",
         "gpt-4-turbo-preview",
