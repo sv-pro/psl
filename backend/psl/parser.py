@@ -64,9 +64,24 @@ Return ONLY valid JSON matching the schema."""
                 temperature=0.1,
             )
 
-            data = json.loads(response.content)
+            # Clean up response content for better JSON parsing
+            content = response.content.strip()
+            
+            # Try to extract JSON from the response if it contains extra text
+            if not content.startswith('{'):
+                # Look for JSON block in the response
+                import re
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if json_match:
+                    content = json_match.group(0)
+                else:
+                    raise ValueError(f"No valid JSON found in response: {content}")
+
+            data = json.loads(content)
             return IR(**data)
 
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in LLM response: {e}\nResponse was: {response.content}")
         except Exception as e:
             raise ValueError(f"Failed to parse prompt: {str(e)}")
 
