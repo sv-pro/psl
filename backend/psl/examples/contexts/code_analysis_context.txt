@@ -1,0 +1,16 @@
+def calculate_total(items):
+    total = 0
+    for item in items:
+        if item.price > 0:
+            total += item.price
+            if item.discount:
+                total -= item.discount
+    return total
+
+def process_order(order):
+    if order.status == "pending":
+        items = order.items
+        total = calculate_total(items)
+        if total > 100:
+            order.apply_free_shipping()
+    return order

@@ -1,7 +1,10 @@
-from litellm import completion
+import asyncio
 import json
 from typing import Dict, Any
+
+from .adapters import get_adapter, LLMMessage
 from .ir import IR
+
 
 class SemanticParser:
     """Converts natural language prompts into structured IR using LLM"""
@@ -46,22 +49,27 @@ Return ONLY valid JSON matching the schema."""
 
     def __init__(self, model: str = "gpt-4"):
         self.model = model
+        self.adapter = get_adapter(model)
 
-    def parse(self, prompt_text: str) -> IR:
-        """Parse prompt into IR"""
+    async def parse_async(self, prompt_text: str) -> IR:
+        """Parse prompt into IR (async version)"""
         try:
-            response = completion(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self.SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Analyze this prompt:\n\n{prompt_text}"}
-                ],
+            messages = [
+                LLMMessage(role="system", content=self.SYSTEM_PROMPT),
+                LLMMessage(role="user", content=f"Analyze this prompt:\n\n{prompt_text}")
+            ]
+
+            response = await self.adapter.complete(
+                messages=messages,
                 temperature=0.1,
             )
 
-            content = response.choices[0].message.content
-            data = json.loads(content)
+            data = json.loads(response.content)
             return IR(**data)
 
         except Exception as e:
             raise ValueError(f"Failed to parse prompt: {str(e)}")
+
+    def parse(self, prompt_text: str) -> IR:
+        """Parse prompt into IR (sync wrapper)"""
+        return asyncio.run(self.parse_async(prompt_text))

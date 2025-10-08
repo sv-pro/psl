@@ -1,0 +1,16 @@
+Analyze customer feedback text if provided.
+
+Return JSON:
+{
+  "sentiment": "positive" | "negative" | "neutral" | null,
+  "mentioned_keywords": [string] or [],
+  "contains_complaint": boolean or null
+}
+
+Definitions:
+- sentiment = "positive" if feedback contains positive words (great, excellent, happy, love, satisfied), "negative" if contains negative words (bad, terrible, disappointed, frustrated, poor), "neutral" otherwise
+- mentioned_keywords = list of product feature names explicitly mentioned in the feedback
+- contains_complaint = true if feedback explicitly requests a fix, refund, or expresses dissatisfaction
+
+If feedback text is empty, return null for sentiment and contains_complaint, empty array for mentioned_keywords.
+Do not infer sentiment beyond what is explicitly stated in the text.

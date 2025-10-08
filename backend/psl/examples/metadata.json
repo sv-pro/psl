@@ -1,0 +1,84 @@
+{
+  "examples": [
+    {
+      "id": "k8s_metrics",
+      "name": "Kubernetes Metrics (Bad)",
+      "category": "Infrastructure",
+      "type": "bad",
+      "prompt_file": "bad/k8s_metrics.txt",
+      "context_file": "contexts/k8s_metrics_context.txt",
+      "description": "Asks for undefined metrics that will cause hallucinations",
+      "expected_behavior": "Model should hallucinate metric values"
+    },
+    {
+      "id": "k8s_metrics_fixed",
+      "name": "Kubernetes Metrics (Fixed)",
+      "category": "Infrastructure",
+      "type": "good",
+      "prompt_file": "good/k8s_metrics_fixed.txt",
+      "context_file": "contexts/k8s_metrics_context.txt",
+      "description": "Provides explicit formulas and fallback strategy",
+      "expected_behavior": "Model should calculate correctly or return null"
+    },
+    {
+      "id": "data_extraction",
+      "name": "Financial Data Extraction (Bad)",
+      "category": "Finance",
+      "type": "bad",
+      "prompt_file": "bad/data_extraction.txt",
+      "context_file": "contexts/data_extraction_context.txt",
+      "description": "Asks for complex financial metrics without definitions",
+      "expected_behavior": "Model should invent metric values"
+    },
+    {
+      "id": "data_extraction_fixed",
+      "name": "Financial Data Extraction (Fixed)",
+      "category": "Finance",
+      "type": "good",
+      "prompt_file": "good/data_extraction_fixed.txt",
+      "context_file": "contexts/data_extraction_context.txt",
+      "description": "Defines formulas and fallback behavior",
+      "expected_behavior": "Model should calculate from provided data"
+    },
+    {
+      "id": "code_analysis",
+      "name": "Code Quality Analysis (Bad)",
+      "category": "Engineering",
+      "type": "bad",
+      "prompt_file": "bad/code_analysis.txt",
+      "context_file": "contexts/code_analysis_context.txt",
+      "description": "Requests vague quality metrics",
+      "expected_behavior": "Model should make up scores"
+    },
+    {
+      "id": "code_analysis_fixed",
+      "name": "Code Quality Analysis (Fixed)",
+      "category": "Engineering",
+      "type": "good",
+      "prompt_file": "good/code_analysis_fixed.txt",
+      "context_file": "contexts/code_analysis_context.txt",
+      "description": "Defines concrete, countable metrics",
+      "expected_behavior": "Model should count actual code elements"
+    },
+    {
+      "id": "user_sentiment",
+      "name": "User Sentiment Analysis (Bad)",
+      "category": "Analytics",
+      "type": "bad",
+      "prompt_file": "bad/user_sentiment.txt",
+      "context_file": "contexts/user_sentiment_context.txt",
+      "description": "Asks for numeric scores without methodology",
+      "expected_behavior": "Model should invent scores"
+    },
+    {
+      "id": "user_sentiment_fixed",
+      "name": "User Sentiment Analysis (Fixed)",
+      "category": "Analytics",
+      "type": "good",
+      "prompt_file": "good/user_sentiment_fixed.txt",
+      "context_file": "contexts/user_sentiment_context.txt",
+      "description": "Uses categorical classification with clear criteria",
+      "expected_behavior": "Model should classify based on explicit text"
+    }
+  ]
+}

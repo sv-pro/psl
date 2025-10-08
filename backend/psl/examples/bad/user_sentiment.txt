@@ -1,0 +1,8 @@
+Analyze customer feedback and determine:
+
+- overall_satisfaction_score (0-100)
+- engagement_level
+- churn_risk_probability
+- net_promoter_likelihood
+
+Be thorough and accurate.
