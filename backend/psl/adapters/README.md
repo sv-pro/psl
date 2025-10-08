@@ -94,6 +94,34 @@ To temporarily disable a provider without removing it from the config:
 
 Models from disabled providers can still be used directly if API keys are configured.
 
+### Enabling/Disabling Individual Models
+
+You can also disable specific models within a provider:
+
+1. **Edit [models.yaml](models.yaml)** - use object format for models:
+   ```yaml
+   providers:
+     ollama:
+       models:
+         - mistral:latest           # Simple string (always enabled)
+         - name: llama2             # Object format
+           enabled: false           # ← Disable specific model
+         - name: llama2:13b
+           enabled: false
+   ```
+
+2. **Restart the backend**
+
+3. **Verify** disabled models are filtered:
+   ```bash
+   make list-models  # Disabled models won't appear
+   make healthcheck  # Won't try to check disabled models
+   ```
+
+**Model formats supported:**
+- **String format**: `- model_name` (always enabled)
+- **Object format**: `- name: model_name` with optional `enabled: false`
+
 ### Adding New Models
 
 To add support for a new model:

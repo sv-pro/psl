@@ -11,11 +11,13 @@
 #       adapter_class: ClassName
 #       description: "..."
 #       models:
-#         - model_id
-#         - model_id:variant
+#         - model_id                          # Simple string (always enabled)
+#         - name: model_id                    # Object format with optional enabled flag
+#           enabled: false                    # Set to false to disable specific model
 
 providers:
   openai:
+    enabled: false 
     adapter_class: OpenAIAdapter
     description: OpenAI GPT models via native SDK
     models:
@@ -26,6 +28,7 @@ providers:
       - gpt-3.5-turbo-16k
 
   anthropic:
+    enabled: false 
     adapter_class: AnthropicAdapter
     description: Anthropic Claude models via native SDK
     models:
@@ -51,14 +54,28 @@ providers:
     description: Local models via Ollama (httpx)
     prefix: ollama/  # Models accessible as ollama/model_name
     models:
-      - llama2
-      - llama2:13b
-      - llama2:70b
-      - mistral
-      - mixtral
-      - codellama
-      - phi
-      - neural-chat
-      - gemma
-      - gemma:2b
-      - gemma:7b
+      # Installed models (enabled)
+      - gemma:latest     # Gemma · Latest
+      - mistral:latest   # Llama · Latest (Mistral)
+      - name: gemma3:latest
+      # Not installed (disabled)
+      - name: llama3:latest
+        enabled: false
+      - name: llama2
+        enabled: false
+      - name: llama2:13b
+        enabled: false
+      - name: llama2:70b
+        enabled: false
+      - name: mixtral
+        enabled: false
+      - name: codellama
+        enabled: false
+      - name: phi
+        enabled: false
+      - name: neural-chat
+        enabled: false
+      - name: gemma:2b
+        enabled: false
+      - name: gemma:7b
+        enabled: false

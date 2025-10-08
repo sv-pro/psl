@@ -116,6 +116,17 @@ make list-models      # See all 26 supported models
 3. Add health check method in `backend/psl/health.py` following the pattern of existing providers
 4. Restart backend (no code changes needed in factory)
 
+### Disabling Models
+Disable specific models without removing them from `models.yaml`:
+```yaml
+providers:
+  ollama:
+    models:
+      - mistral:latest           # String format (always enabled)
+      - name: llama2             # Object format with enabled flag
+        enabled: false           # Disabled - won't be checked or listed
+```
+
 ### New Example Prompt
 1. Add prompt to `backend/psl/examples/bad/` or `good/`
 2. Add context to `backend/psl/examples/contexts/`

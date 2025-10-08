@@ -207,81 +207,88 @@ class HealthChecker:
     async def check_ollama_async(self) -> ProviderCheck:
         """Check Ollama connectivity and model availability using adapter"""
         base_url = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
-
-        # Check a default model using adapter
-        ollama_models = self.available_models.get("ollama", [])
-        if not ollama_models:
-            return ProviderCheck(
-                provider="Ollama",
-                status=HealthStatus.UNHEALTHY,
-                message="No Ollama models configured in models.yaml",
-                api_key_configured=True,
-                models_checked=[]
-            )
-        
-        models_to_check = ollama_models[:1]  # Just check first model
-        model_checks = []
+        model_checks: list[ModelCheck] = []
 
         try:
-            for model in models_to_check:
-                try:
-                    adapter = get_adapter(model, base_url=base_url)
-                    is_healthy = await adapter.health_check()
-
-                    if is_healthy:
-                        model_checks.append(ModelCheck(
-                            model=model,
-                            status=HealthStatus.HEALTHY,
-                            message="Model available"
-                        ))
-                        # If one model works, also list other available models
-                        if hasattr(adapter, 'list_available_models'):
-                            available = await adapter.list_available_models()
-                            for av_model in available[:5]:  # Limit to 5
-                                if av_model != model.replace("ollama/", ""):
-                                    model_checks.append(ModelCheck(
-                                        model=f"ollama/{av_model}",
-                                        status=HealthStatus.HEALTHY,
-                                        message="Available"
-                                    ))
-                        break  # Success, no need to check more
-                    else:
-                        model_checks.append(ModelCheck(
-                            model=model,
-                            status=HealthStatus.UNHEALTHY,
-                            message="Model not found (pull with: ollama pull llama2)"
-                        ))
-                except Exception as e:
-                    model_checks.append(ModelCheck(
-                        model=model,
-                        status=HealthStatus.UNHEALTHY,
-                        message=f"Error: {str(e)}"
-                    ))
-
-            # Determine overall status
-            if any(m.status == HealthStatus.HEALTHY for m in model_checks):
-                status = HealthStatus.HEALTHY
-                message = f"Ollama running at {base_url}"
-            else:
-                status = HealthStatus.UNHEALTHY
-                message = f"Ollama may not be running or no models available at {base_url}"
-
-            return ProviderCheck(
-                provider="Ollama",
-                status=status,
-                message=message,
-                api_key_configured=True,
-                models_checked=model_checks
-            )
-
+            # Fetch installed models directly from Ollama daemon
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(f"{base_url}/api/tags")
+                response.raise_for_status()
+                data = response.json()
+                installed_models = {m["name"] for m in data.get("models", [])}
         except Exception as e:
             return ProviderCheck(
                 provider="Ollama",
                 status=HealthStatus.UNHEALTHY,
-                message=f"Cannot connect to {base_url}: {str(e)}",
+                message=f"Cannot connect to Ollama at {base_url}: {str(e)}",
                 api_key_configured=True,
                 models_checked=[]
             )
+
+        # Get configured (enabled) models from models.yaml (may include disabled entries filtered earlier)
+        configured_models = self.available_models.get("ollama", [])
+
+        # If no configured models, still show installed ones (informational)
+        if not configured_models:
+            if not installed_models:
+                return ProviderCheck(
+                    provider="Ollama",
+                    status=HealthStatus.UNHEALTHY,
+                    message=f"Ollama running at {base_url} but no models installed (pull one with: ollama pull mistral)",
+                    api_key_configured=True,
+                    models_checked=[]
+                )
+            for im in sorted(installed_models):
+                model_checks.append(ModelCheck(
+                    model=f"ollama/{im}",
+                    status=HealthStatus.HEALTHY,
+                    message="Installed (not declared in models.yaml)"
+                ))
+            return ProviderCheck(
+                provider="Ollama",
+                status=HealthStatus.HEALTHY,
+                message=f"Ollama running at {base_url} ({len(installed_models)} installed; none explicitly configured)",
+                api_key_configured=True,
+                models_checked=model_checks
+            )
+
+        # For each configured model, mark installed vs missing
+        healthy_any = False
+        for cfg_model in configured_models:
+            # Strip optional prefix for comparison
+            short_cfg = cfg_model.replace("ollama/", "")
+            # Match either exact tag or base name if tag omitted in config
+            is_installed = any(
+                im == short_cfg or im.split(":")[0] == short_cfg.split(":")[0]
+                for im in installed_models
+            )
+            if is_installed:
+                healthy_any = True
+                model_checks.append(ModelCheck(
+                    model=cfg_model,
+                    status=HealthStatus.HEALTHY,
+                    message="Installed"
+                ))
+            else:
+                model_checks.append(ModelCheck(
+                    model=cfg_model,
+                    status=HealthStatus.UNHEALTHY,
+                    message=f"Not installed (pull with: ollama pull {short_cfg})"
+                ))
+
+        overall_status = HealthStatus.HEALTHY if healthy_any else HealthStatus.UNHEALTHY
+        overall_message = (
+            f"Ollama running at {base_url} - {sum(1 for m in model_checks if m.status == HealthStatus.HEALTHY)} / {len(model_checks)} configured models installed"
+            if configured_models else f"Ollama running at {base_url}"
+        )
+
+        return ProviderCheck(
+            provider="Ollama",
+            status=overall_status,
+            message=overall_message,
+            api_key_configured=True,
+            models_checked=model_checks
+        )
 
     def check_ollama(self) -> ProviderCheck:
         """Sync wrapper for Ollama health check"""
