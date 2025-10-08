@@ -12,7 +12,29 @@ Try the Kubernetes metrics example to see how PSL catches undefined computed fie
 
 This project requires Python 3.11+ and Node.js 18+. We recommend using `pyenv` for Python version management.
 
-### Backend Setup
+### Easy Way (Recommended)
+
+From the project root, run both backend and frontend together:
+
+```bash
+# Install all dependencies
+make install
+
+# Configure API keys
+cp backend/.env.example backend/.env
+# Edit backend/.env and add your ANTHROPIC_API_KEY or OPENAI_API_KEY
+
+# Run both servers in parallel
+make dev
+```
+
+This will start:
+- Backend at `http://localhost:8000`
+- Frontend at `http://localhost:5173`
+
+### Manual Setup
+
+#### Backend Setup
 
 #### Option 1: Using pyenv (Recommended)
 
@@ -189,9 +211,21 @@ pytest tests/   # Run directly
 
 ## How It Works
 
+The UI provides three columns:
+1. **System Prompt** - The prompt template to analyze
+2. **Context/Input** - Example data to test with (e.g., Kubernetes manifest)
+3. **Actions** - Lint, Execute, or both
+
+Results are displayed side-by-side:
+- **Lint Results** - Semantic issues detected in the prompt
+- **Actual LLM Output** - What the model actually produces (to see hallucinations in action)
+
+### Architecture
+
 1. **Semantic Parser** - Converts natural language prompts into structured IR (Intermediate Representation)
 2. **Validator** - Runs linting rules on the IR
-3. **Rules** - Detect specific issues:
+3. **Executor** - Runs the prompt with context to show actual behavior
+4. **Rules** - Detect specific issues:
    - `no-undefined-computed-fields` - Catches metrics/fields without definitions
 
 ## Current Rules

@@ -21,10 +21,36 @@ export interface LintResponse {
   };
 }
 
+export interface ExecuteRequest {
+  prompt: string;
+  context: string;
+  model?: string;
+}
+
+export interface ExecuteResponse {
+  output: string;
+  model: string;
+  has_errors: boolean;
+}
+
 const API_BASE = 'http://localhost:8000';
 
 export async function lintPrompt(req: LintRequest): Promise<LintResponse> {
   const response = await fetch(`${API_BASE}/lint`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function executePrompt(req: ExecuteRequest): Promise<ExecuteResponse> {
+  const response = await fetch(`${API_BASE}/execute`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),

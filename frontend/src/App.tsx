@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Editor from '@monaco-editor/react';
-import { lintPrompt, LintResponse } from './api/client';
+import { lintPrompt, executePrompt, LintResponse, ExecuteResponse } from './api/client';
 
 const EXAMPLE_PROMPT = `You are an expert in analyzing Kubernetes manifests.
 Extract the following metrics:
@@ -10,99 +10,192 @@ Extract the following metrics:
 
 ALL metrics must be calculated from the manifest.`;
 
+const EXAMPLE_CONTEXT = `apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+  namespace: default
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"`;
+
 function App() {
   const [prompt, setPrompt] = useState(EXAMPLE_PROMPT);
+  const [context, setContext] = useState(EXAMPLE_CONTEXT);
   const [model, setModel] = useState('gpt-4');
-  const [results, setResults] = useState<LintResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [lintResults, setLintResults] = useState<LintResponse | null>(null);
+  const [executeResults, setExecuteResults] = useState<ExecuteResponse | null>(null);
+  const [lintLoading, setLintLoading] = useState(false);
+  const [executeLoading, setExecuteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleLint = async () => {
-    setLoading(true);
+    setLintLoading(true);
     setError(null);
     try {
       const response = await lintPrompt({ prompt, model });
-      setResults(response);
+      setLintResults(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
-      setLoading(false);
+      setLintLoading(false);
+    }
+  };
+
+  const handleExecute = async () => {
+    setExecuteLoading(true);
+    setError(null);
+    try {
+      const response = await executePrompt({ prompt, context, model });
+      setExecuteResults(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setExecuteLoading(false);
+    }
+  };
+
+  const handleLintAndExecute = async () => {
+    setLintLoading(true);
+    setExecuteLoading(true);
+    setError(null);
+    try {
+      const [lintRes, execRes] = await Promise.all([
+        lintPrompt({ prompt, model }),
+        executePrompt({ prompt, context, model })
+      ]);
+      setLintResults(lintRes);
+      setExecuteResults(execRes);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLintLoading(false);
+      setExecuteLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1800px] mx-auto">
         <header className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Prompt Semantic Linter</h1>
-          <p className="text-gray-400">Detect semantic issues that cause LLM hallucinations</p>
+          <p className="text-gray-400">Detect semantic issues that cause LLM hallucinations - and see the actual results</p>
         </header>
 
-        <div className="grid grid-cols-2 gap-8">
-          <div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Model</label>
-              <select
-                value={model}
-                onChange={e => setModel(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2"
-              >
-                <option value="gpt-4">GPT-4 (OpenAI)</option>
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                <option value="claude-3-5-haiku-20241022">Claude Haiku 3.5 (fast & cheap)</option>
-                <option value="ollama/llama2">Llama 2 (requires local Ollama)</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Configure API keys in backend/.env
-              </p>
-            </div>
+        {/* Model Selector */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium mb-2">Model</label>
+          <select
+            value={model}
+            onChange={e => setModel(e.target.value)}
+            className="w-full max-w-md bg-gray-800 border border-gray-700 rounded px-4 py-2"
+          >
+            <option value="gpt-4">GPT-4 (OpenAI)</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+            <option value="claude-3-5-haiku-20241022">Claude Haiku 3.5 (fast & cheap)</option>
+            <option value="ollama/llama2">Llama 2 (requires local Ollama)</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Configure API keys in backend/.env
+          </p>
+        </div>
 
+        {/* Main Grid: 3 columns */}
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          {/* Column 1: System Prompt */}
+          <div>
             <label className="block text-sm font-medium mb-2">System Prompt</label>
             <div className="border border-gray-700 rounded overflow-hidden">
               <Editor
-                height="400px"
+                height="300px"
                 defaultLanguage="text"
                 theme="vs-dark"
                 value={prompt}
                 onChange={(value) => setPrompt(value || '')}
               />
             </div>
-
-            <button
-              onClick={handleLint}
-              disabled={loading}
-              className="mt-4 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-6 py-3 rounded font-medium"
-            >
-              {loading ? 'Analyzing...' : 'Lint Prompt'}
-            </button>
           </div>
 
+          {/* Column 2: Context/Input */}
           <div>
-            <label className="block text-sm font-medium mb-2">Results</label>
-            <div className="bg-gray-800 border border-gray-700 rounded p-6 h-[500px] overflow-auto">
-              {error && (
-                <div className="text-red-400 mb-4">
-                  Error: {error}
-                </div>
-              )}
+            <label className="block text-sm font-medium mb-2">Context / User Input</label>
+            <div className="border border-gray-700 rounded overflow-hidden">
+              <Editor
+                height="300px"
+                defaultLanguage="yaml"
+                theme="vs-dark"
+                value={context}
+                onChange={(value) => setContext(value || '')}
+              />
+            </div>
+          </div>
 
-              {results && (
+          {/* Column 3: Action Buttons */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Actions</label>
+            <div className="space-y-3">
+              <button
+                onClick={handleLint}
+                disabled={lintLoading}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-6 py-3 rounded font-medium"
+              >
+                {lintLoading ? 'Linting...' : 'Lint Prompt Only'}
+              </button>
+              <button
+                onClick={handleExecute}
+                disabled={executeLoading}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-6 py-3 rounded font-medium"
+              >
+                {executeLoading ? 'Executing...' : 'Execute Only'}
+              </button>
+              <button
+                onClick={handleLintAndExecute}
+                disabled={lintLoading || executeLoading}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 px-6 py-3 rounded font-medium"
+              >
+                {lintLoading || executeLoading ? 'Running...' : 'Lint + Execute'}
+              </button>
+            </div>
+
+            {error && (
+              <div className="mt-4 p-4 bg-red-900/50 border border-red-700 rounded text-red-300 text-sm">
+                <strong>Error:</strong> {error}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Results Grid: 2 columns */}
+        <div className="grid grid-cols-2 gap-6">
+          {/* Lint Results */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Lint Results</label>
+            <div className="bg-gray-800 border border-gray-700 rounded p-6 min-h-[400px] overflow-auto">
+              {lintResults ? (
                 <>
                   <div className="mb-6">
                     <h3 className="text-lg font-semibold mb-2">Summary</h3>
                     <div className="space-y-1 text-sm">
-                      <div>❌ Errors: {results.summary.total_errors}</div>
-                      <div>⚠️  Warnings: {results.summary.total_warnings}</div>
-                      <div>📊 Computed fields: {results.summary.computed_fields}</div>
-                      <div>🚨 Undefined: {results.summary.undefined_fields}</div>
+                      <div>❌ Errors: {lintResults.summary.total_errors}</div>
+                      <div>⚠️  Warnings: {lintResults.summary.total_warnings}</div>
+                      <div>📊 Computed fields: {lintResults.summary.computed_fields}</div>
+                      <div>🚨 Undefined: {lintResults.summary.undefined_fields}</div>
                     </div>
                   </div>
 
-                  {results.errors.length > 0 && (
+                  {lintResults.errors.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold mb-2">Issues</h3>
                       <div className="space-y-4">
-                        {results.errors.map((err, i) => (
+                        {lintResults.errors.map((err, i) => (
                           <div key={i} className="border-l-4 border-red-500 pl-4 py-2">
                             <div className="font-medium">
                               {err.severity === 'error' ? '❌' : '⚠️'} [{err.rule}]
@@ -115,17 +208,53 @@ function App() {
                     </div>
                   )}
 
-                  {results.errors.length === 0 && (
+                  {lintResults.errors.length === 0 && (
                     <div className="text-green-400">
                       ✅ No issues found! This prompt looks good.
                     </div>
                   )}
                 </>
-              )}
-
-              {!results && !error && !loading && (
+              ) : (
                 <div className="text-gray-500 text-center mt-20">
-                  Click "Lint Prompt" to analyze
+                  Click a button above to analyze
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Execution Results */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Actual LLM Output</label>
+            <div className="bg-gray-800 border border-gray-700 rounded p-6 min-h-[400px] overflow-auto">
+              {executeResults ? (
+                <>
+                  <div className="mb-4 pb-4 border-b border-gray-700">
+                    <div className="text-sm text-gray-400">
+                      Model: <span className="text-white">{executeResults.model}</span>
+                    </div>
+                  </div>
+
+                  <div className="prose prose-invert max-w-none">
+                    <pre className="bg-gray-900 p-4 rounded text-sm overflow-x-auto whitespace-pre-wrap">
+                      {executeResults.output}
+                    </pre>
+                  </div>
+
+                  {lintResults && lintResults.summary.total_errors > 0 && (
+                    <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-700 rounded text-yellow-300 text-sm">
+                      ⚠️ This output may contain hallucinations due to lint errors detected
+                    </div>
+                  )}
+
+                  {lintResults && lintResults.summary.total_errors === 0 && (
+                    <div className="mt-4 p-3 bg-green-900/30 border border-green-700 rounded text-green-300 text-sm">
+                      ✅ Prompt passed linting - output should be reliable
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-gray-500 text-center mt-20">
+                  Execute the prompt to see LLM output
                 </div>
               )}
             </div>
