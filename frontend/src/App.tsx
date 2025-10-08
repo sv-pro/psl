@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
-import { lintPrompt, executePrompt, LintResponse, ExecuteResponse } from './api/client';
+import { lintPrompt, executePrompt, getExamples, getModels, LintResponse, ExecuteResponse, PromptExample, ModelsResponse } from './api/client';
 
 const EXAMPLE_PROMPT = `You are an expert in analyzing Kubernetes manifests.
 Extract the following metrics:
@@ -36,6 +36,43 @@ function App() {
   const [lintLoading, setLintLoading] = useState(false);
   const [executeLoading, setExecuteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Examples and models
+  const [examples, setExamples] = useState<PromptExample[]>([]);
+  const [models, setModels] = useState<ModelsResponse | null>(null);
+  const [selectedExample, setSelectedExample] = useState<string>('');
+
+  // Load examples and models on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [examplesData, modelsData] = await Promise.all([
+          getExamples(),
+          getModels()
+        ]);
+        setExamples(examplesData.examples);
+        setModels(modelsData);
+      } catch (err) {
+        console.error('Failed to load examples/models:', err);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Handle example selection
+  const handleExampleChange = (exampleId: string) => {
+    setSelectedExample(exampleId);
+    if (!exampleId) return;
+
+    const example = examples.find(e => e.id === exampleId);
+    if (example) {
+      setPrompt(example.prompt);
+      setContext(example.context);
+      // Clear previous results when loading new example
+      setLintResults(null);
+      setExecuteResults(null);
+    }
+  };
 
   const handleLint = async () => {
     setLintLoading(true);
@@ -90,22 +127,64 @@ function App() {
           <p className="text-gray-400">Detect semantic issues that cause LLM hallucinations - and see the actual results</p>
         </header>
 
-        {/* Model Selector */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">Model</label>
-          <select
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            className="w-full max-w-md bg-gray-800 border border-gray-700 rounded px-4 py-2"
-          >
-            <option value="gpt-4">GPT-4 (OpenAI)</option>
-            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-            <option value="claude-3-5-haiku-20241022">Claude Haiku 3.5 (fast & cheap)</option>
-            <option value="ollama/llama2">Llama 2 (requires local Ollama)</option>
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            Configure API keys in backend/.env
-          </p>
+        {/* Example and Model Selectors */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          {/* Example Selector */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Load Example Prompt</label>
+            <select
+              value={selectedExample}
+              onChange={e => handleExampleChange(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2"
+            >
+              <option value="">-- Select an example --</option>
+              {examples.map(ex => (
+                <option key={ex.id} value={ex.id}>
+                  {ex.name} ({ex.category})
+                </option>
+              ))}
+            </select>
+            {selectedExample && (
+              <p className="text-xs text-gray-500 mt-1">
+                {examples.find(e => e.id === selectedExample)?.description}
+              </p>
+            )}
+          </div>
+
+          {/* Model Selector */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Model</label>
+            <select
+              value={model}
+              onChange={e => setModel(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2"
+            >
+              {models ? (
+                <>
+                  <optgroup label="OpenAI">
+                    {models.openai.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Anthropic">
+                    {models.anthropic.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Ollama (Local)">
+                    {models.ollama.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </optgroup>
+                </>
+              ) : (
+                <option value="gpt-4">Loading models...</option>
+              )}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Configure API keys in backend/.env
+            </p>
+          </div>
         </div>
 
         {/* Main Grid: 3 columns */}
