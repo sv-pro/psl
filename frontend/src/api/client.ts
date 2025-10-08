@@ -62,3 +62,94 @@ export async function executePrompt(req: ExecuteRequest): Promise<ExecuteRespons
 
   return response.json();
 }
+
+export interface PromptExample {
+  id: string;
+  name: string;
+  category: string;
+  type: 'good' | 'bad';
+  prompt_file: string;
+  context_file: string;
+  description: string;
+  expected_behavior: string;
+  prompt: string;
+  context: string;
+}
+
+export interface ExamplesResponse {
+  examples: PromptExample[];
+}
+
+export async function getExamples(): Promise<ExamplesResponse> {
+  const response = await fetch(`${API_BASE}/examples`);
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export interface ModelsResponse {
+  openai: string[];
+  anthropic: string[];
+  ollama: string[];
+}
+
+export async function getModels(): Promise<ModelsResponse> {
+  const response = await fetch(`${API_BASE}/models`);
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export interface EvaluationRequest {
+  example_ids?: string[];
+  models?: string[];
+}
+
+export interface EvaluationResult {
+  example_id: string;
+  example_name: string;
+  example_type: string;
+  model: string;
+  provider: string;
+  lint_errors_count: number;
+  lint_warnings_count: number;
+  undefined_fields: string[];
+  llm_output: string;
+  execution_error: string | null;
+  outcome: 'success' | 'failure' | 'error';
+  reasoning: string;
+  hallucination_detected: boolean;
+}
+
+export interface EvaluationResponse {
+  results: EvaluationResult[];
+  summary: {
+    total_evaluations: number;
+    successes: number;
+    failures: number;
+    errors: number;
+    success_rate: number;
+    models_tested: string[];
+    examples_tested: number;
+  };
+}
+
+export async function runEvaluation(req: EvaluationRequest): Promise<EvaluationResponse> {
+  const response = await fetch(`${API_BASE}/evaluate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.statusText}`);
+  }
+
+  return response.json();
+}
