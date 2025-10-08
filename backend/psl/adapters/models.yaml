@@ -28,7 +28,7 @@ providers:
       - gpt-3.5-turbo-16k
 
   anthropic:
-    enabled: false 
+    enabled: true 
     adapter_class: AnthropicAdapter
     description: Anthropic Claude models via native SDK
     models:
@@ -40,7 +40,7 @@ providers:
       - claude-3-haiku-20240307
 
   google:
-    enabled: false  # Set to false to disable this provider
+    # enabled: false  # Set to false to disable this provider
     adapter_class: GoogleAdapter
     description: Google AI (Gemini) models via REST API
     models:

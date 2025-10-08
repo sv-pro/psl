@@ -91,9 +91,10 @@ export async function getExamples(): Promise<ExamplesResponse> {
 }
 
 export interface ModelsResponse {
-  openai: string[];
-  anthropic: string[];
-  ollama: string[];
+  openai?: string[];
+  anthropic?: string[];
+  google?: string[]; // Gemini models
+  ollama?: string[];
 }
 
 export async function getModels(): Promise<ModelsResponse> {

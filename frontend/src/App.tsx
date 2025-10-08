@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import Editor from '@monaco-editor/react';
 import { lintPrompt, executePrompt, getExamples, getModels, LintResponse, ExecuteResponse, PromptExample, ModelsResponse } from './api/client';
 
@@ -52,12 +52,25 @@ function App() {
         ]);
         setExamples(examplesData.examples);
         setModels(modelsData);
+
+        // If current model isn't available (e.g., provider disabled), pick first available
+        const allModelLists: string[][] = [
+          modelsData.openai || [],
+          modelsData.anthropic || [],
+          modelsData.google || [],
+          modelsData.ollama || []
+        ];
+        const firstAvailable = allModelLists.find(list => list.length > 0)?.[0];
+        if (firstAvailable && !allModelLists.some(list => list.includes(model))) {
+          setModel(firstAvailable);
+        }
       } catch (err) {
         console.error('Failed to load examples/models:', err);
       }
     };
     loadData();
-  }, []);
+  // model included so that if initial default is invalid when models load we can update it safely
+  }, [model]);
 
   // Handle example selection
   const handleExampleChange = (exampleId: string) => {
@@ -160,25 +173,51 @@ function App() {
               className="w-full bg-gray-800 border border-gray-700 rounded px-4 py-2"
             >
               {models ? (
-                <>
-                  <optgroup label="OpenAI">
-                    {models.openai.map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Anthropic">
-                    {models.anthropic.map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Ollama (Local)">
-                    {models.ollama.map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </optgroup>
-                </>
+                (() => {
+                  const groups: ReactNode[] = [];
+                  if (models.openai && models.openai.length > 0) {
+                    groups.push(
+                      <optgroup key="openai" label="OpenAI">
+                        {models.openai.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  }
+                  if (models.anthropic && models.anthropic.length > 0) {
+                    groups.push(
+                      <optgroup key="anthropic" label="Anthropic">
+                        {models.anthropic.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  }
+                  if (models.google && models.google.length > 0) {
+                    groups.push(
+                      <optgroup key="google" label="Google (Gemini)">
+                        {models.google.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  }
+                  if (models.ollama && models.ollama.length > 0) {
+                    groups.push(
+                      <optgroup key="ollama" label="Ollama (Local)">
+                        {models.ollama.map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  }
+                  if (groups.length === 0) {
+                    return <option value="">No models available</option>;
+                  }
+                  return groups;
+                })()
               ) : (
-                <option value="gpt-4">Loading models...</option>
+                <option value="">Loading models...</option>
               )}
             </select>
             <p className="text-xs text-gray-500 mt-1">
