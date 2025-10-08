@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Literal
 
 class ComputedField(BaseModel):
@@ -27,3 +27,11 @@ class IR(BaseModel):
     constraints: List[Constraint] = Field(default_factory=list)
     domain_terms: List[DomainTerm] = Field(default_factory=list)
     fallback_strategy: Literal["null", "error", "default", "unspecified"] = "unspecified"
+    
+    @field_validator('fallback_strategy', mode='before')
+    @classmethod
+    def validate_fallback_strategy(cls, v):
+        """Handle None/null values from LLM responses"""
+        if v is None:
+            return "unspecified"
+        return v

@@ -2,6 +2,7 @@ from typing import List
 from .ir import IR
 from .rules.base import Rule, LintError
 from .rules.hallucination import NoUndefinedComputedFieldsRule
+from .rules.constraints import ConflictingConstraintsRule
 
 class Validator:
     """Runs linting rules on IR"""
@@ -9,6 +10,7 @@ class Validator:
     def __init__(self):
         self.rules: List[Rule] = [
             NoUndefinedComputedFieldsRule(),
+            ConflictingConstraintsRule(),
         ]
 
     def validate(self, ir: IR) -> List[LintError]:

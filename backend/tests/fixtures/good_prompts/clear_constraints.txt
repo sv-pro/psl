@@ -1,0 +1,3 @@
+Analyze the user database and provide a comprehensive report in JSON format with a professional tone, covering technical aspects in detail.
+
+The output should be structured data that includes key metrics, user behavior patterns, and system performance indicators.

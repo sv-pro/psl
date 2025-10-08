@@ -1,0 +1,3 @@
+Analyze the user database and provide a brief yet comprehensive detailed explanation in both JSON format and plain text format that is both formal and casual in tone, covering both technical and non-technical aspects while being concise but thorough.
+
+This should be a quick summary but also an in-depth analysis that's professional yet conversational, structured as both raw data and formatted output.
