@@ -1,5 +1,6 @@
 import uvicorn
 from dotenv import load_dotenv
+from psl.api import app
 
 # Load environment variables
 load_dotenv()
