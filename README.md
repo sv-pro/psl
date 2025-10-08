@@ -1,10 +1,22 @@
-# Prompt Semantic Linter
+# Prompt Semantic Linter (PSL)
 
-A tool to detect semantic issues in LLM prompts that lead to hallucinations and unpredictable behavior.
+**Measure what matters. Build what lasts. Benchmark what's real.**
+
+PSL is a multi-purpose platform that simultaneously:
+
+1. **Measures Prompt Quality** - Detects semantic issues that cause hallucinations (utility) and validates prompts demonstrate their quality (didactic)
+2. **Demonstrates IntentHub's A.G.I.L.E. Philosophy** - Building reliable AI systems through compositional validation of unreliable components
+3. **Benchmarks Models Fairly** - Compares models using quality-controlled prompts with known expected behaviors
+
+See [PITCH.md](PITCH.md) for the complete value proposition.
 
 ## Demo
 
-Try the Kubernetes metrics example to see how PSL catches undefined computed fields that cause LLMs to hallucinate numbers.
+**Interactive UI** with 8 curated prompt examples:
+- Load bad prompts → see lint errors → execute → observe hallucinations
+- Load fixed prompts → no errors → execute → correct output
+- Compare across 19 models (OpenAI, Anthropic, Ollama)
+- Run didactic evaluation matrix to see which models demonstrate PSL's value
 
 ## Quick Start
 
@@ -108,28 +120,34 @@ npm run dev
 
 Frontend will be running at `http://localhost:5173`
 
-## Supported Models
+## Supported Models (19 total)
 
-### OpenAI Models
-- `gpt-4` - GPT-4 (recommended, most reliable)
-- `gpt-3.5-turbo` - GPT-3.5 Turbo (faster, cheaper)
+PSL uses a **custom adapter layer** with direct API calls (no LiteLLM dependency) for maximum compatibility with latest models.
+
+### OpenAI (via `openai` SDK)
+
+- `gpt-4`, `gpt-4-turbo`, `gpt-4-turbo-preview`
+- `gpt-3.5-turbo`, `gpt-3.5-turbo-16k`
 
 Requires `OPENAI_API_KEY` in `backend/.env`
 
-### Anthropic Claude Models (2025)
-- `claude-sonnet-4-5-20250929` - Claude Sonnet 4.5 (latest, most capable)
-- `claude-3-7-sonnet-20250219` - Claude Sonnet 3.7
-- `claude-3-5-haiku-20241022` - Claude Haiku 3.5 (fast & cost-efficient)
+### Anthropic (via `anthropic` SDK)
+
+- `claude-sonnet-4-5-20250929` ✨ **Latest model - fully supported**
+- `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`
+- `claude-3-opus-20240229`, `claude-3-sonnet-20240229`, `claude-3-haiku-20240307`
 
 Requires `ANTHROPIC_API_KEY` in `backend/.env`
 
-**Note**: Model names change over time. For the latest official model names, see:
-- OpenAI: https://platform.openai.com/docs/models
-- Anthropic: https://docs.anthropic.com/en/docs/about-claude/models
+### Ollama (via `httpx` for local models)
 
-### Local Models
-- `ollama/llama2` - Llama 2 via Ollama (requires Ollama running locally)
-- Configure `OLLAMA_API_BASE=http://localhost:11434` in `backend/.env`
+- `ollama/llama2`, `ollama/llama2:13b`, `ollama/llama2:70b`
+- `ollama/mistral`, `ollama/mixtral`, `ollama/codellama`
+- `ollama/phi`, `ollama/neural-chat`
+
+Requires Ollama running locally. Configure `OLLAMA_API_BASE=http://localhost:11434` in `backend/.env` (optional).
+
+**Model Selection:** All models available in UI dropdown, organized by provider. Use `make list-models` to see full list.
 
 ## Troubleshooting
 
@@ -222,22 +240,44 @@ Results are displayed side-by-side:
 
 ### Architecture
 
-1. **Semantic Parser** - Converts natural language prompts into structured IR (Intermediate Representation)
-2. **Validator** - Runs linting rules on the IR
-3. **Executor** - Runs the prompt with context to show actual behavior
-4. **Rules** - Detect specific issues:
-   - `no-undefined-computed-fields` - Catches metrics/fields without definitions
+PSL demonstrates **A.G.I.L.E. principles** (Auditable, Gradual, Interpretable, Layered, Explicit):
+
+1. **Semantic Parser** - Uses LLM to convert prompts into structured IR (Intermediate Representation)
+2. **Validator** - Runs deterministic linting rules on the IR
+3. **Didactic Evaluator** - Tests prompts × models to measure demonstration effectiveness
+4. **LLM Adapter Layer** - Unified interface across OpenAI, Anthropic, Ollama
+
+**Key Components:**
+
+- **8 Prompt Examples** - 4 bad, 4 good (K8s, finance, code, sentiment)
+- **Didactic Scoring** - Bad prompt + hallucination = ✅ (proves PSL's value)
+- **Model Benchmarking** - Compare 19 models using quality-controlled prompts
+- **API Endpoints** - `/lint`, `/execute`, `/evaluate`, `/models`, `/examples`
 
 ## Current Rules
 
 - ✅ **no-undefined-computed-fields** - Detects computed fields that will cause hallucinations
 
-## Roadmap
+## Features
 
-- [ ] Add more rules (conflicting constraints, ambiguous requirements)
+✅ **Implemented:**
+
+- Custom LLM adapter layer (OpenAI, Anthropic, Ollama)
+- 19 models supported with latest versions
+- 8 curated prompt examples (good and bad)
+- Didactic evaluation system
+- Model benchmarking with quality-controlled prompts
+- Interactive UI with example/model dropdowns
+- Health check system
+- Real-time lint + execute workflow
+
+🔨 **Roadmap:**
+
+- [ ] Additional linting rules (conflicting constraints, ambiguous requirements)
 - [ ] Auto-fix suggestions
 - [ ] VS Code extension
 - [ ] CI/CD integration
+- [ ] Expanded didactic evaluation metrics
 
 ## License
 
