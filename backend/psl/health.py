@@ -42,7 +42,8 @@ class HealthChecker:
 
     def __init__(self):
         self.timeout = httpx.Timeout(10.0)
-        self.available_models = list_available_models()
+        # Use unsorted models to test most important/latest models first
+        self.available_models = list_available_models(sort=False)
 
     async def check_openai_async(self) -> ProviderCheck:
         """Check OpenAI API connectivity and model availability using adapter"""
@@ -58,7 +59,17 @@ class HealthChecker:
             )
 
         # Check first available model using adapter
-        models_to_check = self.available_models.get("openai", ["gpt-4"])[:2]
+        openai_models = self.available_models.get("openai", [])
+        if not openai_models:
+            return ProviderCheck(
+                provider="OpenAI",
+                status=HealthStatus.UNHEALTHY,
+                message="No OpenAI models configured in models.yaml",
+                api_key_configured=True,
+                models_checked=[]
+            )
+        
+        models_to_check = openai_models[:2]
         model_checks = []
 
         for model in models_to_check:
@@ -128,7 +139,17 @@ class HealthChecker:
             )
 
         # Check first available model using adapter
-        models_to_check = self.available_models.get("anthropic", ["claude-3-5-haiku-20241022"])[:2]
+        anthropic_models = self.available_models.get("anthropic", [])
+        if not anthropic_models:
+            return ProviderCheck(
+                provider="Anthropic",
+                status=HealthStatus.UNHEALTHY,
+                message="No Anthropic models configured in models.yaml",
+                api_key_configured=True,
+                models_checked=[]
+            )
+        
+        models_to_check = anthropic_models[:2]
         model_checks = []
 
         for model in models_to_check:
@@ -188,7 +209,17 @@ class HealthChecker:
         base_url = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
 
         # Check a default model using adapter
-        models_to_check = ["ollama/llama2"]
+        ollama_models = self.available_models.get("ollama", [])
+        if not ollama_models:
+            return ProviderCheck(
+                provider="Ollama",
+                status=HealthStatus.UNHEALTHY,
+                message="No Ollama models configured in models.yaml",
+                api_key_configured=True,
+                models_checked=[]
+            )
+        
+        models_to_check = ollama_models[:1]  # Just check first model
         model_checks = []
 
         try:
@@ -256,13 +287,117 @@ class HealthChecker:
         """Sync wrapper for Ollama health check"""
         return asyncio.run(self.check_ollama_async())
 
-    def check_all(self) -> Dict[str, ProviderCheck]:
-        """Check all providers"""
-        return {
-            "openai": self.check_openai(),
-            "anthropic": self.check_anthropic(),
-            "ollama": self.check_ollama()
+    async def check_google_async(self) -> ProviderCheck:
+        """Check Google AI (Gemini) API connectivity and model availability using adapter"""
+        api_key = os.getenv("GOOGLE_API_KEY")
+
+        if not api_key:
+            return ProviderCheck(
+                provider="Google AI",
+                status=HealthStatus.UNCONFIGURED,
+                message="GOOGLE_API_KEY not set in environment",
+                api_key_configured=False,
+                models_checked=[]
+            )
+
+        # Check first available model using adapter
+        google_models = self.available_models.get("google", [])
+        if not google_models:
+            return ProviderCheck(
+                provider="Google AI",
+                status=HealthStatus.UNHEALTHY,
+                message="No Google models configured in models.yaml",
+                api_key_configured=True,
+                models_checked=[]
+            )
+        
+        models_to_check = google_models[:2]
+        model_checks = []
+
+        for model in models_to_check:
+            try:
+                adapter = get_adapter(model)
+                is_healthy = await adapter.health_check()
+
+                if is_healthy:
+                    model_checks.append(ModelCheck(
+                        model=model,
+                        status=HealthStatus.HEALTHY,
+                        message="Model available"
+                    ))
+                else:
+                    model_checks.append(ModelCheck(
+                        model=model,
+                        status=HealthStatus.UNHEALTHY,
+                        message="Health check failed"
+                    ))
+            except ValueError as e:
+                return ProviderCheck(
+                    provider="Google AI",
+                    status=HealthStatus.UNHEALTHY,
+                    message=str(e),
+                    api_key_configured=True,
+                    models_checked=[]
+                )
+            except Exception as e:
+                model_checks.append(ModelCheck(
+                    model=model,
+                    status=HealthStatus.UNHEALTHY,
+                    message=f"Error: {str(e)}"
+                ))
+
+        # Determine overall status
+        if any(m.status == HealthStatus.HEALTHY for m in model_checks):
+            status = HealthStatus.HEALTHY
+            message = "API accessible"
+        else:
+            status = HealthStatus.UNHEALTHY
+            message = "No models available"
+
+        return ProviderCheck(
+            provider="Google AI",
+            status=status,
+            message=message,
+            api_key_configured=True,
+            models_checked=model_checks
+        )
+
+    def check_google(self) -> ProviderCheck:
+        """Sync wrapper for Google health check"""
+        return asyncio.run(self.check_google_async())
+
+    def check_provider(self, provider_name: str) -> ProviderCheck:
+        """Check a specific provider by name dynamically"""
+        provider_methods = {
+            "openai": self.check_openai,
+            "anthropic": self.check_anthropic,
+            "google": self.check_google,
+            "ollama": self.check_ollama,
         }
+        
+        if provider_name not in provider_methods:
+            raise ValueError(f"Unknown provider: {provider_name}")
+        
+        return provider_methods[provider_name]()
+
+    def check_all(self) -> Dict[str, ProviderCheck]:
+        """Check all providers dynamically based on models.yaml"""
+        results = {}
+        
+        # Check all providers that have models configured
+        for provider_name in self.available_models.keys():
+            try:
+                result = self.check_provider(provider_name)
+                results[provider_name] = result
+            except ValueError:
+                # Provider method not implemented yet
+                pass
+        
+        return results
+
+    def get_available_providers(self) -> List[str]:
+        """Get list of provider names from models.yaml"""
+        return list(self.available_models.keys())
 
 
 def format_health_report(results: Dict[str, ProviderCheck]) -> str:

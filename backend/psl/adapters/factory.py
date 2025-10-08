@@ -114,8 +114,12 @@ def get_adapter(model: str, **kwargs) -> LLMAdapter:
     )
 
 
-def list_available_models() -> Dict[str, List[str]]:
+def list_available_models(sort: bool = True) -> Dict[str, List[str]]:
     """List all supported models grouped by provider.
+
+    Args:
+        sort: Whether to sort models alphabetically (default True). 
+              Set to False to preserve order from models.yaml.
 
     Returns:
         Dictionary mapping provider names to lists of model names
@@ -124,10 +128,13 @@ def list_available_models() -> Dict[str, List[str]]:
         >>> models = list_available_models()
         >>> print(models)
         {
-            'openai': ['gpt-4', 'gpt-3.5-turbo', ...],
-            'anthropic': ['claude-sonnet-4-5-20250929', ...],
+            'openai': ['gpt-3.5-turbo', 'gpt-4', ...],  # sorted
+            'anthropic': ['claude-3-5-haiku-20241022', ...],
             'ollama': ['ollama/llama2', 'ollama/mistral', ...]
         }
+        >>> models = list_available_models(sort=False)
+        >>> print(models['anthropic'])
+        ['claude-sonnet-4-5-20250929', 'claude-3-5-sonnet-20241022', ...]  # original order
     """
     models_by_provider: Dict[str, List[str]] = {}
 
@@ -144,8 +151,9 @@ def list_available_models() -> Dict[str, List[str]]:
             else:
                 models_by_provider[provider_name] = models.copy()
 
-            # Sort models within each provider
-            models_by_provider[provider_name].sort()
+            # Sort models within each provider if requested
+            if sort:
+                models_by_provider[provider_name].sort()
 
     except Exception as e:
         print(f"Warning: Failed to load model config, falling back to hardcoded values: {e}")
@@ -156,8 +164,9 @@ def list_available_models() -> Dict[str, List[str]]:
             "google": GoogleAdapter.SUPPORTED_MODELS.copy(),
             "ollama": [f"ollama/{m}" for m in OllamaAdapter.SUPPORTED_MODELS],
         }
-        for provider in models_by_provider:
-            models_by_provider[provider].sort()
+        if sort:
+            for provider in models_by_provider:
+                models_by_provider[provider].sort()
 
     return models_by_provider
 

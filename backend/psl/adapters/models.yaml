@@ -7,7 +7,9 @@
 # Format:
 #   providers:
 #     provider_name:
+#       enabled: true              # Optional: set to false to disable provider (default: true)
 #       adapter_class: ClassName
+#       description: "..."
 #       models:
 #         - model_id
 #         - model_id:variant
@@ -35,6 +37,7 @@ providers:
       - claude-3-haiku-20240307
 
   google:
+    enabled: false  # Set to false to disable this provider
     adapter_class: GoogleAdapter
     description: Google AI (Gemini) models via REST API
     models:

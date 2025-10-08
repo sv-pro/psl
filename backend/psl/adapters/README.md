@@ -35,6 +35,7 @@ providers:
 ```yaml
 providers:
   openai:
+    enabled: true  # Optional: defaults to true
     adapter_class: OpenAIAdapter
     description: OpenAI GPT models via native SDK
     models:
@@ -48,6 +49,13 @@ providers:
       - claude-sonnet-4-5-20250929
       - claude-3-5-sonnet-20241022
 
+  google:
+    enabled: false  # Disabled provider - won't appear in health checks
+    adapter_class: GoogleAdapter
+    description: Google AI (Gemini) models
+    models:
+      - gemini-pro
+
   ollama:
     adapter_class: OllamaAdapter
     description: Local models via Ollama
@@ -57,6 +65,34 @@ providers:
       - mistral
       - gemma
 ```
+
+### Enabling/Disabling Providers
+
+To temporarily disable a provider without removing it from the config:
+
+1. **Edit [models.yaml](models.yaml)**:
+   ```yaml
+   providers:
+     google:
+       enabled: false  # ← Disable provider
+       adapter_class: GoogleAdapter
+       models: [...]
+   ```
+
+2. **Restart the backend**
+
+3. **Verify** it's disabled:
+   ```bash
+   make healthcheck  # Google won't be checked
+   psl check -h      # Google won't appear in choices
+   ```
+
+**Note:** Disabled providers are excluded from:
+- Health checks (`make healthcheck`)
+- Model listings (`make list-models`)
+- CLI provider choices (`psl check <provider>`)
+
+Models from disabled providers can still be used directly if API keys are configured.
 
 ### Adding New Models
 

@@ -60,16 +60,30 @@ def get_provider_models(provider: str, config: Dict[str, Any] | None = None) -> 
     return providers[provider].get("models", [])
 
 
-def get_all_providers(config: Dict[str, Any] | None = None) -> Dict[str, Dict[str, Any]]:
+def get_all_providers(config: Dict[str, Any] | None = None, include_disabled: bool = False) -> Dict[str, Dict[str, Any]]:
     """Get all provider configurations.
 
     Args:
         config: Loaded config dict (if None, loads from default path)
+        include_disabled: If True, include providers with enabled=false (default: False)
 
     Returns:
         Dictionary mapping provider names to their configurations
+        (only enabled providers unless include_disabled=True)
     """
     if config is None:
         config = load_model_config()
 
-    return config.get("providers", {})
+    providers = config.get("providers", {})
+    
+    if include_disabled:
+        return providers
+    
+    # Filter out disabled providers
+    enabled_providers = {}
+    for name, provider_config in providers.items():
+        # Default to enabled if not specified
+        if provider_config.get("enabled", True):
+            enabled_providers[name] = provider_config
+    
+    return enabled_providers

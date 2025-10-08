@@ -44,25 +44,23 @@ def cmd_healthcheck(args):
 def cmd_check_provider(args):
     """Check a specific provider"""
     checker = HealthChecker()
+    available_providers = checker.get_available_providers()
 
-    provider_map = {
-        "openai": checker.check_openai,
-        "anthropic": checker.check_anthropic,
-        "ollama": checker.check_ollama
-    }
-
-    if args.provider not in provider_map:
+    if args.provider not in available_providers:
         print(f"Error: Unknown provider '{args.provider}'")
-        print(f"Available: {', '.join(provider_map.keys())}")
+        print(f"Available: {', '.join(sorted(available_providers))}")
         return 1
 
     print(f"Checking {args.provider}...\n")
-    result = provider_map[args.provider]()
-
-    report = format_health_report({args.provider: result})
-    print(report)
-
-    return 0 if result.status == HealthStatus.HEALTHY else 1
+    
+    try:
+        result = checker.check_provider(args.provider)
+        report = format_health_report({args.provider: result})
+        print(report)
+        return 0 if result.status == HealthStatus.HEALTHY else 1
+    except ValueError as e:
+        print(f"Error: {e}")
+        return 1
 
 
 def cmd_list_models(args):
@@ -131,9 +129,17 @@ Examples:
         "check",
         help="Check a specific provider"
     )
+    
+    # Get available providers dynamically
+    try:
+        temp_checker = HealthChecker()
+        available_providers = temp_checker.get_available_providers()
+    except:
+        available_providers = ["openai", "anthropic", "google", "ollama"]
+    
     check_parser.add_argument(
         "provider",
-        choices=["openai", "anthropic", "ollama"],
+        choices=sorted(available_providers),
         help="Provider to check"
     )
     check_parser.set_defaults(func=cmd_check_provider)
