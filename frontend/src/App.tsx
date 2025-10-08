@@ -2,34 +2,9 @@ import { useState, useEffect, ReactNode } from 'react';
 import Editor from '@monaco-editor/react';
 import { lintPrompt, executePrompt, getExamples, getModels, LintResponse, ExecuteResponse, PromptExample, ModelsResponse } from './api/client';
 
-const EXAMPLE_PROMPT = `You are an expert in analyzing Kubernetes manifests.
-Extract the following metrics:
-- pod_density_ratio
-- mesh_coherence_index
-- scheduling_entropy
-
-ALL metrics must be calculated from the manifest.`;
-
-const EXAMPLE_CONTEXT = `apiVersion: v1
-kind: Pod
-metadata:
-  name: nginx-pod
-  namespace: default
-spec:
-  containers:
-  - name: nginx
-    image: nginx:1.14.2
-    resources:
-      requests:
-        memory: "64Mi"
-        cpu: "250m"
-      limits:
-        memory: "128Mi"
-        cpu: "500m"`;
-
 function App() {
-  const [prompt, setPrompt] = useState(EXAMPLE_PROMPT);
-  const [context, setContext] = useState(EXAMPLE_CONTEXT);
+  const [prompt, setPrompt] = useState('');
+  const [context, setContext] = useState('');
   const [model, setModel] = useState('gpt-4');
   const [lintResults, setLintResults] = useState<LintResponse | null>(null);
   const [executeResults, setExecuteResults] = useState<ExecuteResponse | null>(null);
@@ -53,6 +28,14 @@ function App() {
         setExamples(examplesData.examples);
         setModels(modelsData);
 
+        // Load first example by default if none selected and editors are empty
+        if (!selectedExample && !prompt && !context && examplesData.examples.length > 0) {
+          const firstExample = examplesData.examples[0];
+          setSelectedExample(firstExample.id);
+          setPrompt(firstExample.prompt);
+          setContext(firstExample.context);
+        }
+
         // If current model isn't available (e.g., provider disabled), pick first available
         const allModelLists: string[][] = [
           modelsData.openai || [],
@@ -69,8 +52,9 @@ function App() {
       }
     };
     loadData();
-  // model included so that if initial default is invalid when models load we can update it safely
-  }, [model]);
+  // Only run once on mount - we check the current state inside the effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle example selection
   const handleExampleChange = (exampleId: string) => {
@@ -86,6 +70,33 @@ function App() {
       setExecuteResults(null);
     }
   };
+
+  // Auto-select example if current prompt matches one after examples load (and none selected)
+  useEffect(() => {
+    if (!selectedExample && examples.length > 0) {
+      const match = examples.find(e => e.prompt && e.prompt.trim() === prompt.trim());
+      if (match) {
+        setSelectedExample(match.id);
+      }
+    }
+  }, [examples, prompt, selectedExample]);
+
+  // If user edits prompt or context so it no longer matches the selected example, clear the selection
+  useEffect(() => {
+    if (!selectedExample) return;
+    const ex = examples.find(e => e.id === selectedExample);
+    if (!ex) return;
+    // Only clear if BOTH have diverged (user fully moved away from example)
+    const promptChanged = ex.prompt.trim() !== prompt.trim();
+    const contextChanged = ex.context.trim() !== context.trim();
+    if (promptChanged && contextChanged) setSelectedExample('');
+  }, [prompt, context, selectedExample, examples]);
+
+  const selectedExampleMeta = selectedExample ? examples.find(e => e.id === selectedExample) : null;
+  const exampleModified = !!(selectedExampleMeta && (
+    selectedExampleMeta.prompt.trim() !== prompt.trim() ||
+    selectedExampleMeta.context.trim() !== context.trim()
+  ));
 
   const handleLint = async () => {
     setLintLoading(true);
@@ -157,9 +168,12 @@ function App() {
                 </option>
               ))}
             </select>
-            {selectedExample && (
-              <p className="text-xs text-gray-500 mt-1">
-                {examples.find(e => e.id === selectedExample)?.description}
+            {selectedExampleMeta && (
+              <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                <span>{selectedExampleMeta.description}</span>
+                {exampleModified && (
+                  <span className="px-2 py-0.5 bg-yellow-600/30 text-yellow-300 rounded border border-yellow-600/50">Modified</span>
+                )}
               </p>
             )}
           </div>
